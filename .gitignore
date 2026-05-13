@@ -1,4 +1,5 @@
 .*.lck
 *.s#?
 *.b#?
+*.code-workspace
 
