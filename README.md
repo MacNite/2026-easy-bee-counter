@@ -1,4 +1,5 @@
 # Bee Counter Redesign — Full Specification
+## This is all WIP - Nothing is done yet
 ### Single PCB + 3D Printed Housing, integrated with HiveScale
 
 ---
