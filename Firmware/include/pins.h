@@ -94,7 +94,12 @@ constexpr uint8_t MCP_GATES_20_27 = 0x22;   // U4
 
 // Our own slave address (we are SLAVE to the HiveScale on this address).
 // 0x30 is unused by any device on this board and not in the reserved range.
-constexpr uint8_t BEECOUNTER_SLAVE = 0x30;
+    namespace i2c_addr {
+    #ifndef BEECOUNTER_I2C_ADDRESS
+    #define BEECOUNTER_I2C_ADDRESS 0x30
+    #endif
+    constexpr uint8_t BEECOUNTER_SLAVE = BEECOUNTER_I2C_ADDRESS;
+    }
 
 }  // namespace i2c_addr
 
