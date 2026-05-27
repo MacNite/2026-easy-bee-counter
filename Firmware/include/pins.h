@@ -85,8 +85,11 @@ constexpr int IR_LED_BANK_2_EN  = 9;   // U5 D9 / silk "D9" -> Q2 gate -> gates 
 // ---------------------------------------------------------------------------
 // I2C device addresses on the shared bus
 // ---------------------------------------------------------------------------
-namespace i2c_addr {
+#ifndef BEECOUNTER_I2C_ADDRESS
+#define BEECOUNTER_I2C_ADDRESS 0x30   // default; override with -DBEECOUNTER_I2C_ADDRESS=0x31 for hive 2
+#endif
 
+namespace i2c_addr {
 // MCP23017 expanders (we are MASTER when talking to these)
 constexpr uint8_t MCP_GATES_00_07 = 0x20;   // U2
 constexpr uint8_t MCP_GATES_10_17 = 0x21;   // U3
@@ -94,13 +97,8 @@ constexpr uint8_t MCP_GATES_20_27 = 0x22;   // U4
 
 // Our own slave address (we are SLAVE to the HiveScale on this address).
 // 0x30 is unused by any device on this board and not in the reserved range.
-    namespace i2c_addr {
-    #ifndef BEECOUNTER_I2C_ADDRESS
-    #define BEECOUNTER_I2C_ADDRESS 0x30
-    #endif
-    constexpr uint8_t BEECOUNTER_SLAVE = BEECOUNTER_I2C_ADDRESS;
-    }
-
+// For dual-hive setups, flash the hive-2 unit with -DBEECOUNTER_I2C_ADDRESS=0x31.
+constexpr uint8_t BEECOUNTER_SLAVE = BEECOUNTER_I2C_ADDRESS;
 }  // namespace i2c_addr
 
 // ---------------------------------------------------------------------------
