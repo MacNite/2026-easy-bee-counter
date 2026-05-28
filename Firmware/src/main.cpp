@@ -1,7 +1,8 @@
 // ============================================================================
-// Easy Bee Counter 2026 — ESP32-C6 mini firmware
+// Easy Bee Counter 2026 — ESP32-C6 mini firmware  (DUAL-I2C revision)
 // ----------------------------------------------------------------------------
 // Author: rewritten 2026 for the new ESP32-C6 mini board.
+// 2026 revision: split the single shared I2C bus into TWO dedicated buses.
 //
 // What this firmware does
 // -----------------------
@@ -11,36 +12,27 @@
 //        Outer-then-Inner = bee entered the hive   -> "in" counter++
 //        Inner-then-Outer = bee left the hive      -> "out" counter++
 //   3. Maintains lifetime totals, per-interval totals, and per-gate detail.
-//   4. Acts as an I2C slave at address 0x30 so the main HiveScale ESP32 can
-//      poll it whenever it wakes (roughly every 10 minutes).
+//   4. Acts as an I2C slave at address 0x30 on a SEPARATE bus so the main
+//      HiveScale ESP32 can poll it at any time without any timing constraints.
 //
-// Hardware constraint: single shared I2C bus
-// ------------------------------------------
-// The PCB ties the external connector J1 (which goes to the HiveScale) to
-// the SAME SDA/SCL net that the on-board MCP23017s live on. The ESP32-C6 has
-// only ONE hardware I2C controller and that controller cannot be master and
-// slave simultaneously, so this firmware does:
+// Dual-bus hardware layout (NEW)
+// ------------------------------
+// The ESP32-C6 has TWO independent I2C controllers, so we now dedicate one to
+// each role and never switch modes:
 //
-//     mostly:   MASTER -- poll MCP23017s every ~10 ms to detect crossings
-//     briefly:  SLAVE  -- when the HiveScale starts a transaction with us
+//   Wire   (bus 0): MASTER only, GPIO4/GPIO5  -> the 3x MCP23017s.
+//   Wire1  (bus 1): SLAVE  only, GPIO2/GPIO3  -> the HiveScale link.
 //
-// To make the role-switching predictable, the firmware reserves a fixed
-// "slave window" each cycle during which it sits in slave mode listening
-// for the HiveScale. The HiveScale only polls about every 10 minutes, so
-// any reasonable window length works; we use 5 ms of slave listening per
-// 50 ms of master polling (10% duty). Crossings during a slave window are
-// not missed because the sensor data is sticky inside the MCP23017 — we
-// simply read a slightly-older state next time.
+// The external HiveScale connector is wired to GPIO2 (SDA_HiveScale) and
+// GPIO3 (SCL_HiveScale). Pull-ups for that bus are provided by the HiveScale
+// I2C network. The old J1<->GPIO4/5 SDA/SCL traces are cut.
 //
-// If a collision does happen (HiveScale starts a transaction at the very
-// moment we are mid-MCP-read), the HiveScale will get a NACK or a stretch.
-// It must retry; one retry is virtually guaranteed to succeed.
-//
-// SAFER ALTERNATIVE (not used here): cut the J1<->SDA/SDC traces on the PCB
-// and reroute the HiveScale link to two of the unused ESP32-C6 pins
-// (D0..D3, D10) using bit-banged software I2C for the MCP23017s on D4/D5
-// and the hardware I2C peripheral in slave mode on the rerouted pins. Doing
-// this would eliminate the mode-switch entirely. See README.md for details.
+// Consequences vs. the old single-bus firmware:
+//   - No master/slave time-multiplexing, no "slave window" scheduler.
+//   - The HiveScale can start a transaction at any instant; it can never
+//     collide with an MCP read, so no NACK/stretch retry is required.
+//   - REG_BUSY_RETRIES is retained in the protocol for compatibility but is
+//     now always 0.
 // ============================================================================
 
 #include <Arduino.h>
@@ -54,14 +46,10 @@
 // Compile-time tuning knobs — keep these together for easy field adjustment
 // ============================================================================
 
-// How many milliseconds the firmware spends in master mode between slave
-// windows. Lower = more responsive crossing detection but lower probability
-// of catching the HiveScale's transaction first try.
-static constexpr uint32_t MASTER_WINDOW_MS = 50;
-
-// How many milliseconds the firmware spends in slave mode each cycle.
-// 5 ms easily covers a 9-byte I2C transaction at 100 kHz (~0.9 ms each).
-static constexpr uint32_t SLAVE_WINDOW_MS = 5;
+// How often (ms) we poll the MCP23017s for crossing detection. With a
+// dedicated master bus we can poll continuously; 5 ms keeps CPU use modest
+// while still catching the ~12 ms beam dwell of a crossing bee.
+static constexpr uint32_t POLL_INTERVAL_MS = 5;
 
 // Minimum time a sensor must read "blocked" (LOW) to be considered a real
 // detection event rather than electrical noise. Bees crossing at ~25 cm/s
@@ -77,10 +65,14 @@ static constexpr uint32_t GATE_PAIRING_WINDOW_MS = 2000;
 // sensor-fault status bit. A bee cannot physically block a beam for 30 s.
 static constexpr uint32_t SENSOR_STUCK_MS = 30000;
 
-// I2C bus speed when we are master. 400 kHz is the MCP23017's spec limit;
-// 100 kHz is safer over long cabling. The shared bus and external J1 cable
-// argue for the slower setting.
+// I2C bus speed for the master (MCP) bus. 400 kHz is the MCP23017 spec limit;
+// 100 kHz is safer over long cabling. The on-board MCP traces are short, but
+// 100 kHz is left as the conservative default.
 static constexpr uint32_t I2C_MASTER_HZ = 100000;
+
+// I2C clock for the HiveScale slave bus. As a slave the C6 follows the
+// master's clock; this value is only the controller's configured rate.
+static constexpr uint32_t I2C_SLAVE_HZ = 100000;
 
 // ============================================================================
 // Per-gate state machine
@@ -97,13 +89,6 @@ static constexpr uint32_t I2C_MASTER_HZ = 100000;
 //
 // After an event the gate resets to IDLE only once BOTH sensors have
 // returned to CLEAR for at least SENSOR_DEBOUNCE_MS.
-//
-// This is intentionally simple. It will mis-classify bees that reverse mid-
-// crossing (which is rare in practice) and bees that walk in pairs (more
-// common — but the IR beam is sharp enough that two bees side-by-side trip
-// the same sensor and are counted as one). For a higher-accuracy classifier
-// you would extend this state machine; the protocol exposes per-gate counts
-// so improvements can be measured.
 // ============================================================================
 
 enum class GateState : uint8_t {
@@ -148,11 +133,11 @@ static volatile uint32_t g_total_in  = 0;
 static volatile uint32_t g_total_out = 0;
 
 static volatile uint16_t g_glitch_count  = 0;
-static volatile uint16_t g_busy_retries  = 0;
+static volatile uint16_t g_busy_retries  = 0;   // retained, always 0 now
 static volatile uint8_t  g_status_flags  = 0;
 
 // ============================================================================
-// MCP23017 driver objects
+// MCP23017 driver objects  (all on Wire / bus 0)
 // ============================================================================
 static Adafruit_MCP23X17 g_mcp_u2;   // 0x20, gates 00..07
 static Adafruit_MCP23X17 g_mcp_u3;   // 0x21, gates 10..17
@@ -162,10 +147,8 @@ static bool g_mcp_u2_ok = false;
 static bool g_mcp_u3_ok = false;
 static bool g_mcp_u4_ok = false;
 
-// LED-bank control. Auto = follow the polling cycle; we leave the LEDs on
-// continuously while polling, switch them off during slave windows to save
-// some current. The IRLB8721 N-FET is logic-level and just needs a digital
-// HIGH on its gate.
+// LED-bank control. AUTO leaves the LEDs on continuously while running.
+// The IRLB8721 N-FET is logic-level and just needs a digital HIGH on its gate.
 enum class LedMode : uint8_t { AUTO, FORCE_ON, FORCE_OFF };
 static volatile LedMode g_led_mode = LedMode::AUTO;
 
@@ -173,24 +156,20 @@ static volatile LedMode g_led_mode = LedMode::AUTO;
 // I2C slave-callback state (shared with ISR context)
 // ============================================================================
 //
-// The Wire library invokes our onReceive() and onRequest() handlers in an
-// ISR-ish callback context. We keep the work tiny: copy a register pointer
-// into a global, and on read, stream bytes from a pre-built response buffer.
-//
-// To avoid tearing when the main loop updates counters while we are filling
-// the response buffer, we use a snapshot built under "no master in flight"
-// conditions only.
+// Wire1 invokes onReceive()/onRequest() in an ISR-ish callback context. We
+// keep the work tiny: stash the register pointer on receive, and on request
+// stream bytes from a locally-built response buffer. Counter reads are of
+// volatile snapshots updated by the main loop; a torn multi-byte read is
+// harmless here because the HiveScale re-reads each interval and we only ever
+// hand out the latched *shadow* values, which the main loop updates only
+// inside a noInterrupts() block on CMD_LATCH.
 // ============================================================================
 
 static volatile uint8_t  g_reg_pointer = beecounter_proto::REG_STATUS;
-static volatile bool     g_slave_active = false;   // currently in slave mode
-static volatile bool     g_master_busy  = false;   // currently mid-MCP read
 
 // Response buffer: enough room for the largest single-read register block.
 // The biggest is REG_PER_GATE_IN (24 bytes) or REG_PER_GATE_OUT (24 bytes).
 static constexpr size_t SLAVE_TX_BUF_SIZE = 32;
-static uint8_t g_slave_tx_buf[SLAVE_TX_BUF_SIZE];
-static volatile uint8_t g_slave_tx_len = 0;
 
 // ============================================================================
 // Low-level helpers
@@ -326,7 +305,6 @@ static void updateGate(uint8_t gate_idx, bool raw_inner, bool raw_outer,
 // chip failed to respond -- in that case we don't update the affected
 // gates' sensor state this cycle, which is harmless.
 static bool pollAllGates() {
-    g_master_busy = true;
     const uint32_t now_ms = millis();
 
     // Read each chip's full GPIO state as a 16-bit value -- much faster
@@ -360,131 +338,126 @@ static bool pollAllGates() {
         updateGate(i, inner_blocked, outer_blocked, now_ms);
     }
 
-    g_master_busy = false;
     return !any_fail;
 }
 
 // ============================================================================
-// Master <-> Slave mode switching
+// I2C slave (Wire1) callbacks — registered once in setup(), never torn down
 // ============================================================================
 
-static void enterSlaveMode() {
-    if (g_slave_active) return;
-    Wire.end();
-    delay(1);   // brief settle
-    // begin() with an address parameter puts the C6 in slave mode.
-    Wire.begin((uint8_t)i2c_addr::BEECOUNTER_SLAVE, pins::I2C_SDA, pins::I2C_SCL, (uint32_t)I2C_MASTER_HZ);
-    Wire.onReceive([](int n_bytes) {
-        // The HiveScale wrote n_bytes to us. The first byte is the register
-        // pointer; any further bytes are command payload (only REG_CTRL
-        // takes a payload byte).
-        if (n_bytes <= 0) return;
-        uint8_t reg = (uint8_t)Wire.read();
-        g_reg_pointer = reg;
-        if (reg == beecounter_proto::REG_CTRL && n_bytes >= 2) {
-            uint8_t cmd = (uint8_t)Wire.read();
-            switch (cmd) {
-            case beecounter_proto::CMD_LATCH:
-                // Atomically copy live -> shadow, then zero live.
-                noInterrupts();
-                g_interval_in_shadow  = g_interval_in_live;
-                g_interval_out_shadow = g_interval_out_live;
-                g_interval_in_live  = 0;
-                g_interval_out_live = 0;
-                for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
-                    g_gate_shadow[i] = g_gate_live[i];
-                    g_gate_live[i]   = {0, 0};
-                }
-                interrupts();
-                break;
-            case beecounter_proto::CMD_CLEAR_TOTALS:
-                g_total_in  = 0;
-                g_total_out = 0;
-                break;
-            case beecounter_proto::CMD_CLEAR_FAULTS:
-                g_status_flags &= ~(beecounter_proto::STATUS_SENSOR_FAULT_FLAG |
-                                    beecounter_proto::STATUS_OVERFLOW_FLAG);
-                break;
-            case beecounter_proto::CMD_LEDS_OFF:  g_led_mode = LedMode::FORCE_OFF; break;
-            case beecounter_proto::CMD_LEDS_ON:   g_led_mode = LedMode::FORCE_ON;  break;
-            case beecounter_proto::CMD_LEDS_AUTO: g_led_mode = LedMode::AUTO;       break;
-            default: break;
+static void onSlaveReceive(int n_bytes) {
+    // The HiveScale wrote n_bytes to us. The first byte is the register
+    // pointer; any further bytes are command payload (only REG_CTRL takes a
+    // payload byte).
+    if (n_bytes <= 0) return;
+    uint8_t reg = (uint8_t)Wire1.read();
+    g_reg_pointer = reg;
+    if (reg == beecounter_proto::REG_CTRL && n_bytes >= 2) {
+        uint8_t cmd = (uint8_t)Wire1.read();
+        switch (cmd) {
+        case beecounter_proto::CMD_LATCH:
+            // Atomically copy live -> shadow, then zero live.
+            noInterrupts();
+            g_interval_in_shadow  = g_interval_in_live;
+            g_interval_out_shadow = g_interval_out_live;
+            g_interval_in_live  = 0;
+            g_interval_out_live = 0;
+            for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
+                g_gate_shadow[i] = g_gate_live[i];
+                g_gate_live[i]   = {0, 0};
             }
+            interrupts();
+            break;
+        case beecounter_proto::CMD_CLEAR_TOTALS:
+            g_total_in  = 0;
+            g_total_out = 0;
+            break;
+        case beecounter_proto::CMD_CLEAR_FAULTS:
+            g_status_flags &= ~(beecounter_proto::STATUS_SENSOR_FAULT_FLAG |
+                                beecounter_proto::STATUS_OVERFLOW_FLAG);
+            break;
+        case beecounter_proto::CMD_LEDS_OFF:  g_led_mode = LedMode::FORCE_OFF; break;
+        case beecounter_proto::CMD_LEDS_ON:   g_led_mode = LedMode::FORCE_ON;  break;
+        case beecounter_proto::CMD_LEDS_AUTO: g_led_mode = LedMode::AUTO;       break;
+        default: break;
         }
-        // drain anything else
-        while (Wire.available()) (void)Wire.read();
-    });
-
-    Wire.onRequest([]() {
-        // HiveScale wants to read from the previously written register
-        // pointer. Stream bytes from the appropriate snapshot.
-        uint8_t buf[SLAVE_TX_BUF_SIZE];
-        size_t n = 0;
-
-        switch (g_reg_pointer) {
-        case beecounter_proto::REG_PROTOCOL_VERSION:
-            buf[n++] = beecounter_proto::PROTOCOL_VERSION;
-            break;
-        case beecounter_proto::REG_STATUS:
-            buf[n++] = g_status_flags;
-            break;
-        case beecounter_proto::REG_UPTIME_S: {
-            uint32_t s = millis() / 1000;
-            if (s > 0xFFFF) s = 0xFFFF;
-            writeU16BE(&buf[n], (uint16_t)s); n += 2;
-            break;
-        }
-        case beecounter_proto::REG_NUM_GATES:
-            buf[n++] = gates::NUM_GATES;
-            break;
-        case beecounter_proto::REG_GATES_HEALTHY:
-            buf[n++] = (uint8_t)((g_mcp_u2_ok ? 1 : 0) +
-                                 (g_mcp_u3_ok ? 1 : 0) +
-                                 (g_mcp_u4_ok ? 1 : 0));
-            break;
-        case beecounter_proto::REG_TOTAL_IN:
-            writeU32BE(&buf[n], g_total_in);  n += 4; break;
-        case beecounter_proto::REG_TOTAL_OUT:
-            writeU32BE(&buf[n], g_total_out); n += 4; break;
-        case beecounter_proto::REG_INTERVAL_IN:
-            writeU32BE(&buf[n], g_interval_in_shadow);  n += 4; break;
-        case beecounter_proto::REG_INTERVAL_OUT:
-            writeU32BE(&buf[n], g_interval_out_shadow); n += 4; break;
-        case beecounter_proto::REG_GLITCH_COUNT:
-            writeU16BE(&buf[n], g_glitch_count); n += 2; break;
-        case beecounter_proto::REG_BUSY_RETRIES:
-            writeU16BE(&buf[n], g_busy_retries); n += 2; break;
-        case beecounter_proto::REG_PER_GATE_IN:
-            for (uint8_t i = 0; i < gates::NUM_GATES; i++)
-                buf[n++] = g_gate_shadow[i].in;
-            break;
-        case beecounter_proto::REG_PER_GATE_OUT:
-            for (uint8_t i = 0; i < gates::NUM_GATES; i++)
-                buf[n++] = g_gate_shadow[i].out;
-            break;
-        case beecounter_proto::REG_CTRL:
-            buf[n++] = 0xFF;   // write-only
-            break;
-        default:
-            buf[n++] = 0xFF;
-            break;
-        }
-        Wire.write(buf, n);
-    });
-
-    g_slave_active = true;
+    }
+    // drain anything else
+    while (Wire1.available()) (void)Wire1.read();
 }
 
-static void enterMasterMode() {
-    if (!g_slave_active) return;
-    Wire.end();
-    delay(1);
-    Wire.begin(pins::I2C_SDA, pins::I2C_SCL, (uint32_t)I2C_MASTER_HZ);
-    g_slave_active = false;
+static void onSlaveRequest() {
+    // HiveScale wants to read from the previously written register pointer.
+    // Stream bytes from the appropriate snapshot.
+    uint8_t buf[SLAVE_TX_BUF_SIZE];
+    size_t n = 0;
+
+    switch (g_reg_pointer) {
+    case beecounter_proto::REG_PROTOCOL_VERSION:
+        buf[n++] = beecounter_proto::PROTOCOL_VERSION;
+        break;
+    case beecounter_proto::REG_STATUS:
+        buf[n++] = g_status_flags;
+        break;
+    case beecounter_proto::REG_UPTIME_S: {
+        uint32_t s = millis() / 1000;
+        if (s > 0xFFFF) s = 0xFFFF;
+        writeU16BE(&buf[n], (uint16_t)s); n += 2;
+        break;
+    }
+    case beecounter_proto::REG_NUM_GATES:
+        buf[n++] = gates::NUM_GATES;
+        break;
+    case beecounter_proto::REG_GATES_HEALTHY:
+        buf[n++] = (uint8_t)((g_mcp_u2_ok ? 1 : 0) +
+                             (g_mcp_u3_ok ? 1 : 0) +
+                             (g_mcp_u4_ok ? 1 : 0));
+        break;
+    case beecounter_proto::REG_TOTAL_IN:
+        writeU32BE(&buf[n], g_total_in);  n += 4; break;
+    case beecounter_proto::REG_TOTAL_OUT:
+        writeU32BE(&buf[n], g_total_out); n += 4; break;
+    case beecounter_proto::REG_INTERVAL_IN:
+        writeU32BE(&buf[n], g_interval_in_shadow);  n += 4; break;
+    case beecounter_proto::REG_INTERVAL_OUT:
+        writeU32BE(&buf[n], g_interval_out_shadow); n += 4; break;
+    case beecounter_proto::REG_GLITCH_COUNT:
+        writeU16BE(&buf[n], g_glitch_count); n += 2; break;
+    case beecounter_proto::REG_BUSY_RETRIES:
+        writeU16BE(&buf[n], g_busy_retries); n += 2; break;
+    case beecounter_proto::REG_PER_GATE_IN:
+        for (uint8_t i = 0; i < gates::NUM_GATES; i++)
+            buf[n++] = g_gate_shadow[i].in;
+        break;
+    case beecounter_proto::REG_PER_GATE_OUT:
+        for (uint8_t i = 0; i < gates::NUM_GATES; i++)
+            buf[n++] = g_gate_shadow[i].out;
+        break;
+    case beecounter_proto::REG_CTRL:
+        buf[n++] = 0xFF;   // write-only
+        break;
+    default:
+        buf[n++] = 0xFF;
+        break;
+    }
+    Wire1.write(buf, n);
+}
+
+// Bring up the dedicated HiveScale slave bus (Wire1) on GPIO2/GPIO3 once.
+static void initHiveSlaveBus() {
+    // begin() with an address parameter puts this controller in slave mode.
+    Wire1.begin((uint8_t)i2c_addr::BEECOUNTER_SLAVE,
+                pins::I2C_HIVE_SDA, pins::I2C_HIVE_SCL,
+                (uint32_t)I2C_SLAVE_HZ);
+    Wire1.onReceive(onSlaveReceive);
+    Wire1.onRequest(onSlaveRequest);
+    Serial.printf("[I2C] HiveScale slave bus up on GPIO%d/%d @ 0x%02X\n",
+                  pins::I2C_HIVE_SDA, pins::I2C_HIVE_SCL,
+                  (unsigned)i2c_addr::BEECOUNTER_SLAVE);
 }
 
 // ============================================================================
-// Boot-time MCP23017 setup
+// Boot-time MCP23017 setup  (Wire / bus 0)
 // ============================================================================
 
 static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
@@ -492,10 +465,7 @@ static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
         Serial.printf("[MCP] %s @ 0x%02X: NOT FOUND\n", tag, addr);
         return false;
     }
-    // Configure every pin (0..15) as input with internal pull-up off
-    // (the board has 100k externals, but turning the MCP pull-up on too
-    // shouldn't hurt; we leave it off to preserve the external R-divider
-    // characteristic). All 16 pins are sensor inputs.
+    // All 16 pins are sensor inputs.
     for (uint8_t p = 0; p < 16; p++) {
         mcp.pinMode(p, INPUT);
     }
@@ -507,8 +477,6 @@ static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
 // Arduino setup() / loop()
 // ============================================================================
 
-static uint32_t g_last_window_switch_ms = 0;
-static bool g_in_slave_window = false;
 static uint32_t g_last_poll_ms = 0;
 
 void setup() {
@@ -516,7 +484,7 @@ void setup() {
     delay(200);
     Serial.println();
     Serial.println("==============================================");
-    Serial.println("Easy Bee Counter 2026 — firmware booting");
+    Serial.println("Easy Bee Counter 2026 — firmware booting (dual-I2C)");
     Serial.println("==============================================");
 
     // Configure LED enable pins -- start with LEDs off so we can verify
@@ -526,7 +494,7 @@ void setup() {
     digitalWrite(pins::IR_LED_BANK_1_EN, LOW);
     digitalWrite(pins::IR_LED_BANK_2_EN, LOW);
 
-    // Start in master mode to probe the three MCP23017s.
+    // Bus 0 (Wire): permanent MASTER for the MCP23017s.
     Wire.begin(pins::I2C_SDA, pins::I2C_SCL, (uint32_t)I2C_MASTER_HZ);
 
     g_mcp_u2_ok = initMcp(g_mcp_u2, i2c_addr::MCP_GATES_00_07, "U2 (gates 00..07)");
@@ -537,6 +505,9 @@ void setup() {
     if (g_mcp_u3_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U3_OK;
     if (g_mcp_u4_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U4_OK;
 
+    // Bus 1 (Wire1): permanent SLAVE for the HiveScale on GPIO2/GPIO3.
+    initHiveSlaveBus();
+
     // Light up the IR emitters now that the chips are configured.
     setIrLeds(true);
 
@@ -545,7 +516,6 @@ void setup() {
     pollAllGates();
 
     g_status_flags |= beecounter_proto::STATUS_READY;
-    g_last_window_switch_ms = millis();
 
     Serial.println("[SETUP] Entering normal counting loop");
 }
@@ -553,37 +523,18 @@ void setup() {
 void loop() {
     const uint32_t now = millis();
 
-    // ---- Master/slave window scheduling ----
-    if (g_in_slave_window) {
-        if (now - g_last_window_switch_ms >= SLAVE_WINDOW_MS) {
-            enterMasterMode();
-            g_in_slave_window = false;
-            g_last_window_switch_ms = now;
-        }
-    } else {
-        if (now - g_last_window_switch_ms >= MASTER_WINDOW_MS) {
-            enterSlaveMode();
-            g_in_slave_window = true;
-            g_last_window_switch_ms = now;
-        }
-    }
-
-    // ---- Master work ----
-    if (!g_in_slave_window) {
-        // Poll the MCP23017s at most once every ~5 ms to leave time for the
-        // window scheduler. In practice readGPIOAB() takes ~0.3 ms each, so
-        // three of them plus state-machine work fit comfortably in 2 ms.
-        if (now - g_last_poll_ms >= 5) {
-            g_last_poll_ms = now;
-            pollAllGates();
-        }
+    // ---- Master work: poll the MCP23017s every POLL_INTERVAL_MS ----
+    // The HiveScale slave bus (Wire1) is serviced asynchronously by its
+    // onReceive/onRequest callbacks, so the loop body only does master work.
+    if (now - g_last_poll_ms >= POLL_INTERVAL_MS) {
+        g_last_poll_ms = now;
+        pollAllGates();
     }
 
     // Keep the IR LEDs in sync with current mode (auto/force).
     static LedMode last_led_mode = LedMode::AUTO;
     if (g_led_mode != last_led_mode) {
         last_led_mode = g_led_mode;
-        // Re-apply current state.
         bool target = (g_led_mode == LedMode::FORCE_OFF) ? false : true;
         setIrLeds(target);
     }
