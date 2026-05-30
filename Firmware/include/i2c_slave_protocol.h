@@ -31,7 +31,8 @@
 namespace beecounter_proto {
 
 // Protocol revision. Increment whenever a register layout changes.
-constexpr uint8_t PROTOCOL_VERSION = 1;
+// v2 = added the OTA-over-I2C register block (REG_OTA_*, 0x90..0x94).
+constexpr uint8_t PROTOCOL_VERSION = 2;
 
 // --------------------------------------------------------------------------
 // Register map
@@ -120,6 +121,53 @@ constexpr uint8_t CMD_CLEAR_FAULTS   = 0x04;   // Clear STATUS_SENSOR_FAULT_FLAG
 constexpr uint8_t CMD_LEDS_OFF       = 0x10;   // Force IR LEDs off (debug).
 constexpr uint8_t CMD_LEDS_ON        = 0x11;   // Force IR LEDs on  (debug).
 constexpr uint8_t CMD_LEDS_AUTO      = 0x12;   // Restore normal LED management.
+
+// --------------------------------------------------------------------------
+// OTA-over-I2C register block (PROTOCOL_VERSION >= 2)
+// --------------------------------------------------------------------------
+// The HiveScale relays a firmware image to this BeeCounter over I2C. The
+// HiveScale downloads the image over WiFi, then streams it here in frames.
+// All multi-byte fields are BIG-ENDIAN, consistent with the rest of the map.
+//
+//  Addr  Dir    Name              Payload / meaning
+//  ----  -----  ----------------- --------------------------------------------
+//  0x90  WRITE  REG_OTA_BEGIN     8 bytes: size(4) + crc32(4). Slave prepares
+//                                  the OTA partition (Update.begin) and enters
+//                                  OTA_STATE_RECEIVING. Gate polling pauses.
+//  0x91  WRITE  REG_OTA_DATA      offset(4) + data(1..OTA_CHUNK_MAX). Slave
+//                                  Update.write()s the payload if offset
+//                                  matches bytes-received-so-far.
+//  0x92  WRITE  REG_OTA_END       0 bytes. Slave verifies size + CRC, calls
+//                                  Update.end(true), enters OTA_STATE_DONE,
+//                                  and reboots shortly after.
+//  0x93  WRITE  REG_OTA_ABORT     0 bytes. Slave aborts and returns to IDLE.
+//  0x94  READ   REG_OTA_STATUS    6 bytes: state(1) + received(4) + err(1).
+// --------------------------------------------------------------------------
+
+constexpr uint8_t REG_OTA_BEGIN  = 0x90;   // write 8 bytes (size + crc32)
+constexpr uint8_t REG_OTA_DATA   = 0x91;   // write offset(4) + data
+constexpr uint8_t REG_OTA_END    = 0x92;   // write 0 bytes -> finalize
+constexpr uint8_t REG_OTA_ABORT  = 0x93;   // write 0 bytes -> cancel
+constexpr uint8_t REG_OTA_STATUS = 0x94;   // read 6 bytes
+
+// Max data-payload bytes per REG_OTA_DATA frame. The ESP32 Wire RX buffer is
+// 128 bytes by default; 64 keeps reg(1)+offset(4)+data inside one callback
+// with comfortable headroom.
+constexpr uint8_t OTA_CHUNK_MAX = 64;
+
+// OTA state machine values (REG_OTA_STATUS byte 0). Any value >= the first
+// error code (0x10) means a fatal error occurred and the transfer is dead.
+constexpr uint8_t OTA_STATE_IDLE      = 0x00;
+constexpr uint8_t OTA_STATE_RECEIVING = 0x01;
+constexpr uint8_t OTA_STATE_DONE      = 0x02;   // verified, will reboot
+constexpr uint8_t OTA_STATE_ERR_BEGIN = 0x10;   // Update.begin() failed
+constexpr uint8_t OTA_STATE_ERR_SEQ   = 0x11;   // offset mismatch
+constexpr uint8_t OTA_STATE_ERR_WRITE = 0x12;   // Update.write() short/failed
+constexpr uint8_t OTA_STATE_ERR_CRC   = 0x13;   // final CRC mismatch
+constexpr uint8_t OTA_STATE_ERR_SIZE  = 0x14;   // received != declared size
+constexpr uint8_t OTA_STATE_ERR_END   = 0x15;   // Update.end() failed
+
+constexpr uint8_t OTA_ERR_NONE = 0x00;
 
 // --------------------------------------------------------------------------
 // Convenience: total size of the per-gate arrays, kept in sync with the

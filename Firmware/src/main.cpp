@@ -38,6 +38,7 @@
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_MCP23X17.h>
+#include <Update.h>          // ESP32 OTA writer (esp_ota under the hood)
 
 #include "pins.h"
 #include "i2c_slave_protocol.h"
@@ -167,6 +168,21 @@ static volatile LedMode g_led_mode = LedMode::AUTO;
 
 static volatile uint8_t  g_reg_pointer = beecounter_proto::REG_STATUS;
 
+// ----------------------------------------------------------------------------
+// OTA-over-I2C state (PROTOCOL_VERSION >= 2). Written from the Wire1 slave
+// callback context, read by loop(). g_ota_active pauses gate polling for the
+// duration of a transfer; g_ota_reboot defers the restart until loop() runs,
+// so the HiveScale gets a chance to read OTA_STATE_DONE first.
+// ----------------------------------------------------------------------------
+static volatile bool     g_ota_active       = false;
+static volatile bool     g_ota_reboot       = false;
+static volatile uint8_t  g_ota_state        = beecounter_proto::OTA_STATE_IDLE;
+static volatile uint8_t  g_ota_err          = beecounter_proto::OTA_ERR_NONE;
+static volatile uint32_t g_ota_size         = 0;            // declared image size
+static volatile uint32_t g_ota_expected_crc = 0;            // declared CRC32
+static volatile uint32_t g_ota_received     = 0;            // bytes written so far
+static volatile uint32_t g_ota_running_crc  = 0xFFFFFFFFu;  // CRC accumulator
+
 // Response buffer: enough room for the largest single-read register block.
 // The biggest is REG_PER_GATE_IN (24 bytes) or REG_PER_GATE_OUT (24 bytes).
 static constexpr size_t SLAVE_TX_BUF_SIZE = 32;
@@ -194,6 +210,18 @@ static void writeU32BE(uint8_t* buf, uint32_t v) {
     buf[1] = (uint8_t)(v >> 16);
     buf[2] = (uint8_t)(v >> 8);
     buf[3] = (uint8_t)(v & 0xFF);
+}
+
+// Incremental CRC-32 (IEEE 802.3, poly 0xEDB88420). Seed 0xFFFFFFFF, finalize
+// by XOR 0xFFFFFFFF. Must match the HiveScale and backend (zlib.crc32).
+static uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
+    for (size_t i = 0; i < len; i++) {
+        crc ^= data[i];
+        for (uint8_t b = 0; b < 8; b++) {
+            crc = (crc & 1) ? (crc >> 1) ^ 0xEDB88420u : (crc >> 1);
+        }
+    }
+    return crc;
 }
 
 // ============================================================================
@@ -382,6 +410,89 @@ static void onSlaveReceive(int n_bytes) {
         default: break;
         }
     }
+    // ---- OTA-over-I2C frames (PROTOCOL_VERSION >= 2) ----
+    else if (reg == beecounter_proto::REG_OTA_BEGIN) {
+        // 8 payload bytes: size(4 BE) + crc32(4 BE).
+        uint8_t p[8];
+        size_t got = 0;
+        while (Wire1.available() && got < 8) p[got++] = (uint8_t)Wire1.read();
+        if (got < 8) {
+            g_ota_state = beecounter_proto::OTA_STATE_ERR_BEGIN;
+        } else {
+            g_ota_size = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+                         ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+            g_ota_expected_crc = ((uint32_t)p[4] << 24) | ((uint32_t)p[5] << 16) |
+                                 ((uint32_t)p[6] << 8)  |  (uint32_t)p[7];
+            g_ota_received     = 0;
+            g_ota_running_crc  = 0xFFFFFFFFu;
+            g_ota_active       = true;      // pause gate polling now
+            if (!Update.begin(g_ota_size)) {
+                g_ota_state  = beecounter_proto::OTA_STATE_ERR_BEGIN;
+                g_ota_err    = (uint8_t)Update.getError();
+                g_ota_active = false;
+            } else {
+                g_ota_state  = beecounter_proto::OTA_STATE_RECEIVING;
+                g_ota_err    = beecounter_proto::OTA_ERR_NONE;
+            }
+        }
+    }
+    else if (reg == beecounter_proto::REG_OTA_DATA) {
+        if (g_ota_state != beecounter_proto::OTA_STATE_RECEIVING) {
+            while (Wire1.available()) (void)Wire1.read();   // ignore stray frame
+        } else {
+            uint8_t off_b[4];
+            size_t og = 0;
+            while (Wire1.available() && og < 4) off_b[og++] = (uint8_t)Wire1.read();
+            uint32_t offset = ((uint32_t)off_b[0] << 24) | ((uint32_t)off_b[1] << 16) |
+                              ((uint32_t)off_b[2] << 8)  |  (uint32_t)off_b[3];
+            uint8_t data[beecounter_proto::OTA_CHUNK_MAX];
+            size_t dn = 0;
+            while (Wire1.available() && dn < sizeof(data)) data[dn++] = (uint8_t)Wire1.read();
+
+            if (offset != g_ota_received) {
+                g_ota_state  = beecounter_proto::OTA_STATE_ERR_SEQ;
+                Update.abort();
+                g_ota_active = false;
+            } else if (dn > 0) {
+                size_t w = Update.write(data, dn);
+                if (w != dn) {
+                    g_ota_state  = beecounter_proto::OTA_STATE_ERR_WRITE;
+                    g_ota_err    = (uint8_t)Update.getError();
+                    Update.abort();
+                    g_ota_active = false;
+                } else {
+                    g_ota_running_crc = crc32_update(g_ota_running_crc, data, dn);
+                    g_ota_received   += dn;
+                }
+            }
+        }
+    }
+    else if (reg == beecounter_proto::REG_OTA_END) {
+        while (Wire1.available()) (void)Wire1.read();
+        if (g_ota_state == beecounter_proto::OTA_STATE_RECEIVING) {
+            uint32_t final_crc = g_ota_running_crc ^ 0xFFFFFFFFu;
+            if (g_ota_received != g_ota_size) {
+                g_ota_state = beecounter_proto::OTA_STATE_ERR_SIZE;
+                Update.abort();
+            } else if (final_crc != g_ota_expected_crc) {
+                g_ota_state = beecounter_proto::OTA_STATE_ERR_CRC;
+                Update.abort();
+            } else if (!Update.end(true)) {       // true = set boot partition
+                g_ota_state = beecounter_proto::OTA_STATE_ERR_END;
+                g_ota_err   = (uint8_t)Update.getError();
+            } else {
+                g_ota_state  = beecounter_proto::OTA_STATE_DONE;
+                g_ota_reboot = true;              // loop() reboots after status read
+            }
+            g_ota_active = false;
+        }
+    }
+    else if (reg == beecounter_proto::REG_OTA_ABORT) {
+        while (Wire1.available()) (void)Wire1.read();
+        if (g_ota_state == beecounter_proto::OTA_STATE_RECEIVING) Update.abort();
+        g_ota_state  = beecounter_proto::OTA_STATE_IDLE;
+        g_ota_active = false;
+    }
     // drain anything else
     while (Wire1.available()) (void)Wire1.read();
 }
@@ -435,6 +546,11 @@ static void onSlaveRequest() {
         break;
     case beecounter_proto::REG_CTRL:
         buf[n++] = 0xFF;   // write-only
+        break;
+    case beecounter_proto::REG_OTA_STATUS:
+        buf[n++] = g_ota_state;
+        writeU32BE(&buf[n], g_ota_received); n += 4;
+        buf[n++] = g_ota_err;
         break;
     default:
         buf[n++] = 0xFF;
@@ -521,12 +637,23 @@ void setup() {
 }
 
 void loop() {
+    // Deferred reboot: the HiveScale has had a chance to read OTA_STATE_DONE
+    // from REG_OTA_STATUS, so it's safe to restart into the new firmware.
+    if (g_ota_reboot) {
+        Serial.println("[OTA] verified — rebooting into new firmware");
+        delay(50);            // let any in-flight I2C ack settle
+        ESP.restart();
+    }
+
     const uint32_t now = millis();
 
     // ---- Master work: poll the MCP23017s every POLL_INTERVAL_MS ----
     // The HiveScale slave bus (Wire1) is serviced asynchronously by its
     // onReceive/onRequest callbacks, so the loop body only does master work.
-    if (now - g_last_poll_ms >= POLL_INTERVAL_MS) {
+    // While an OTA transfer is in progress we skip polling so the CPU is
+    // dedicated to servicing inbound firmware frames; bee counts during the
+    // ~20 s update are intentionally sacrificed.
+    if (!g_ota_active && now - g_last_poll_ms >= POLL_INTERVAL_MS) {
         g_last_poll_ms = now;
         pollAllGates();
     }
