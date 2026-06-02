@@ -9,8 +9,8 @@
 - honey bee education or museum type installation
 - introduction to electronics, soldering and micro-controller programming
 
-![pic](https://github.com/hydronics2/2019-easy-bee-counter/blob/master/Data/orientation_flights.PNG)
-![pic](https://github.com/hydronics2/2019-easy-bee-counter/blob/master/Data/forage.PNG)
+![pic](https://github.com/macnite/2026-easy-bee-counter/blob/master/Data/orientation_flights.PNG)
+![pic](https://github.com/macnite/2026-easy-bee-counter/blob/master/Data/forage.PNG)
 
 
 ## Hive health
