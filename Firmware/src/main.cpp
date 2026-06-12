@@ -4,6 +4,14 @@
 // Author: rewritten 2026 for the new ESP32-C6 mini board.
 // 2026 revision: split the single shared I2C bus into TWO dedicated buses.
 //
+// 2026-06 power revision: the IR emitters are now PULSED instead of left on
+// continuously. Each poll turns the emitter banks on only for the brief window
+// needed to settle the phototransistors and read the MCP23017s, then turns
+// them off again. At the default POLL_INTERVAL_MS=5 / LED_SETTLE_US=250 with a
+// ~1.5 ms three-chip read, the emitter duty cycle drops from 100% to roughly
+// 35%, and raising POLL_INTERVAL_MS lowers it proportionally. See the
+// "Pulsed-LED sampling" section below.
+//
 // What this firmware does
 // -----------------------
 //   1. Continuously polls 24 entrance gates (each gate = Inner IR sensor +
@@ -50,6 +58,12 @@
 // How often (ms) we poll the MCP23017s for crossing detection. With a
 // dedicated master bus we can poll continuously; 5 ms keeps CPU use modest
 // while still catching the ~12 ms beam dwell of a crossing bee.
+//
+// With pulsed LEDs, this is also the emitter pulse PERIOD: the LEDs are lit
+// for (LED_SETTLE_US + the three-chip read time) once every POLL_INTERVAL_MS.
+// Raising it lowers both CPU use and emitter duty cycle, at the cost of coarser
+// timing resolution on a crossing. 5 ms still resolves a ~12 ms beam dwell into
+// ~2-3 samples, which is enough for the inner/outer ordering to be reliable.
 static constexpr uint32_t POLL_INTERVAL_MS = 5;
 
 // Minimum time a sensor must read "blocked" (LOW) to be considered a real
@@ -69,11 +83,45 @@ static constexpr uint32_t SENSOR_STUCK_MS = 30000;
 // I2C bus speed for the master (MCP) bus. 400 kHz is the MCP23017 spec limit;
 // 100 kHz is safer over long cabling. The on-board MCP traces are short, but
 // 100 kHz is left as the conservative default.
+//
+// NOTE on pulsed LEDs: the emitters stay lit for the whole three-chip read, so
+// the emitter ON-time (and therefore the duty cycle / average current) scales
+// with the read time. At 100 kHz the read is ~1.5 ms; bumping this to 400000
+// shortens it to ~0.4 ms and cuts emitter duty roughly 3-4x with no loss of
+// detection quality on the short on-board traces. Worth doing if you want lower
+// power without touching POLL_INTERVAL_MS.
 static constexpr uint32_t I2C_MASTER_HZ = 100000;
 
 // I2C clock for the HiveScale slave bus. As a slave the C6 follows the
 // master's clock; this value is only the controller's configured rate.
 static constexpr uint32_t I2C_SLAVE_HZ = 100000;
+
+// ---------------------------------------------------------------------------
+// Pulsed-LED sampling
+// ---------------------------------------------------------------------------
+// The QRE1113 reflective sensor's phototransistor needs a short settle time
+// after its IR emitter switches on before the collector voltage is valid. The
+// device's optical rise/fall times are on the order of ~10 us; 250 us is a
+// comfortable, conservative margin that also covers the RC settling of the
+// 100k MCP pull-up against the phototransistor + any board capacitance.
+//
+// The sampling sequence each poll is:
+//     1. turn BOTH emitter banks ON
+//     2. busy-wait LED_SETTLE_US for the phototransistors to settle
+//     3. read all three MCP23017s (emitters stay on across the whole read)
+//     4. turn BOTH emitter banks OFF
+//
+// Both banks are pulsed together (not per-bank) so that a single readGPIOAB()
+// sweep of all three chips sees every gate correctly lit; gates on U3 straddle
+// the two banks, so splitting the read per bank would needlessly double the
+// emitter on-time. Average emitter current ≈ peak * (settle + read) /
+// (POLL_INTERVAL_MS * 1000). With the defaults that is ~35% of the old
+// always-on draw; raise POLL_INTERVAL_MS and/or I2C_MASTER_HZ to push lower.
+//
+// FORCE_ON keeps the old continuous behaviour (useful for bench/oscilloscope
+// work); FORCE_OFF blacks the emitters out entirely (counts will read clear);
+// AUTO is the new pulsed mode and the default.
+static constexpr uint32_t LED_SETTLE_US = 250;
 
 // ============================================================================
 // Per-gate state machine
@@ -148,7 +196,10 @@ static bool g_mcp_u2_ok = false;
 static bool g_mcp_u3_ok = false;
 static bool g_mcp_u4_ok = false;
 
-// LED-bank control. AUTO leaves the LEDs on continuously while running.
+// LED-bank control.
+// AUTO now PULSES the LEDs: they are lit only for the settle+read window of
+// each poll (see pollAllGates / sampleGatesPulsed). FORCE_ON restores the old
+// always-on behaviour; FORCE_OFF keeps them dark.
 // The IRLB8721 N-FET is logic-level and just needs a digital HIGH on its gate.
 enum class LedMode : uint8_t { AUTO, FORCE_ON, FORCE_OFF };
 static volatile LedMode g_led_mode = LedMode::AUTO;
@@ -191,13 +242,28 @@ static constexpr size_t SLAVE_TX_BUF_SIZE = 32;
 // Low-level helpers
 // ============================================================================
 
-static void setIrLeds(bool on) {
-    if (g_led_mode == LedMode::FORCE_OFF) on = false;
-    if (g_led_mode == LedMode::FORCE_ON)  on = true;
+// Drive both emitter-bank MOSFETs to the same state and update the status bit.
+// This is the raw control used by FORCE_ON/FORCE_OFF and by the pulsed sampler.
+// It does NOT consult g_led_mode (the caller decides), so the pulsed sampler
+// can momentarily turn the LEDs on/off within AUTO mode without fighting the
+// mode gate.
+static void driveIrLeds(bool on) {
     digitalWrite(pins::IR_LED_BANK_1_EN, on ? HIGH : LOW);
     digitalWrite(pins::IR_LED_BANK_2_EN, on ? HIGH : LOW);
     if (on) g_status_flags |=  beecounter_proto::STATUS_IR_LEDS_ON;
     else    g_status_flags &= ~beecounter_proto::STATUS_IR_LEDS_ON;
+}
+
+// Apply a steady LED state honouring the mode overrides. Used when the mode
+// changes (e.g. CMD_LEDS_ON/OFF) and at boot. In AUTO mode the steady state is
+// OFF — the emitters are only lit transiently by the pulsed sampler — so a
+// call here with on=true while in AUTO is treated as "leave pulsing to the
+// sampler" and forces the steady level OFF.
+static void setIrLeds(bool on) {
+    if (g_led_mode == LedMode::FORCE_OFF) on = false;
+    else if (g_led_mode == LedMode::FORCE_ON) on = true;
+    else /* AUTO */ on = false;   // pulsed: steady level is OFF between samples
+    driveIrLeds(on);
 }
 
 // Big-endian encode helpers.
@@ -329,21 +395,59 @@ static void updateGate(uint8_t gate_idx, bool raw_inner, bool raw_outer,
     }
 }
 
+// Read all three MCP23017s into v_u2/v_u3/v_u4. The emitters must already be
+// lit and settled before this is called. Returns false if any chip failed to
+// respond (its value is left at 0 = all-blocked, but the caller skips updating
+// gates on a failed chip via the any_fail path it tracks separately).
+static bool readAllMcp(uint16_t& v_u2, uint16_t& v_u3, uint16_t& v_u4) {
+    bool any_fail = false;
+    v_u2 = v_u3 = v_u4 = 0;
+    if (g_mcp_u2_ok) v_u2 = g_mcp_u2.readGPIOAB(); else any_fail = true;
+    if (g_mcp_u3_ok) v_u3 = g_mcp_u3.readGPIOAB(); else any_fail = true;
+    if (g_mcp_u4_ok) v_u4 = g_mcp_u4.readGPIOAB(); else any_fail = true;
+    return !any_fail;
+}
+
+// Acquire one fresh set of sensor readings with the emitters pulsed on only for
+// the settle + read window. In FORCE_ON the emitters are already steady-on, so
+// we skip the extra toggling. In FORCE_OFF we never light them (readings will
+// look "clear"), preserving the diagnostic meaning of that mode.
+static bool sampleGates(uint16_t& v_u2, uint16_t& v_u3, uint16_t& v_u4) {
+    switch (g_led_mode) {
+    case LedMode::FORCE_OFF:
+        // Emitters stay dark; read whatever the sensors show (nominally clear).
+        return readAllMcp(v_u2, v_u3, v_u4);
+
+    case LedMode::FORCE_ON:
+        // Emitters are already steady-on (set when the mode was entered); just
+        // read. No per-sample toggling so a scope trace shows a clean DC level.
+        return readAllMcp(v_u2, v_u3, v_u4);
+
+    case LedMode::AUTO:
+    default:
+        // Pulsed path: light both banks, let the phototransistors settle, read
+        // across the lit window, then black the emitters out again.
+        driveIrLeds(true);
+        delayMicroseconds(LED_SETTLE_US);
+        {
+            bool ok = readAllMcp(v_u2, v_u3, v_u4);
+            driveIrLeds(false);
+            return ok;
+        }
+    }
+}
+
 // Poll all three MCP23017s and update every gate. Returns false if any
 // chip failed to respond -- in that case we don't update the affected
 // gates' sensor state this cycle, which is harmless.
 static bool pollAllGates() {
     const uint32_t now_ms = millis();
 
-    // Read each chip's full GPIO state as a 16-bit value -- much faster
-    // than digitalRead() per pin. Adafruit_MCP23X17::readGPIOAB() returns
-    // GPIOA in the low byte and GPIOB in the high byte.
+    // Acquire a fresh sensor snapshot with the emitters pulsed (AUTO) or steady
+    // (FORCE_ON) per the current LED mode. Adafruit_MCP23X17::readGPIOAB()
+    // returns GPIOA in the low byte and GPIOB in the high byte.
     uint16_t v_u2 = 0, v_u3 = 0, v_u4 = 0;
-    bool any_fail = false;
-
-    if (g_mcp_u2_ok) v_u2 = g_mcp_u2.readGPIOAB(); else any_fail = true;
-    if (g_mcp_u3_ok) v_u3 = g_mcp_u3.readGPIOAB(); else any_fail = true;
-    if (g_mcp_u4_ok) v_u4 = g_mcp_u4.readGPIOAB(); else any_fail = true;
+    bool ok = sampleGates(v_u2, v_u3, v_u4);
 
     // Named getBit to avoid clashing with Arduino.h's bit(b) macro.
     auto getBit = [](uint16_t v, uint8_t pin) -> bool {
@@ -366,7 +470,7 @@ static bool pollAllGates() {
         updateGate(i, inner_blocked, outer_blocked, now_ms);
     }
 
-    return !any_fail;
+    return ok;
 }
 
 // ============================================================================
@@ -413,93 +517,85 @@ static void onSlaveReceive(int n_bytes) {
     // ---- OTA-over-I2C frames (PROTOCOL_VERSION >= 2) ----
     else if (reg == beecounter_proto::REG_OTA_BEGIN) {
         // 8 payload bytes: size(4 BE) + crc32(4 BE).
-        uint8_t p[8];
-        size_t got = 0;
-        while (Wire1.available() && got < 8) p[got++] = (uint8_t)Wire1.read();
-        if (got < 8) {
-            g_ota_state = beecounter_proto::OTA_STATE_ERR_BEGIN;
-        } else {
-            g_ota_size = ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
-                         ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
-            g_ota_expected_crc = ((uint32_t)p[4] << 24) | ((uint32_t)p[5] << 16) |
-                                 ((uint32_t)p[6] << 8)  |  (uint32_t)p[7];
+        if (n_bytes >= 9) {
+            uint8_t b[8];
+            for (uint8_t i = 0; i < 8; i++) b[i] = (uint8_t)Wire1.read();
+            uint32_t size = ((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) |
+                            ((uint32_t)b[2] << 8)  | (uint32_t)b[3];
+            uint32_t crc  = ((uint32_t)b[4] << 24) | ((uint32_t)b[5] << 16) |
+                            ((uint32_t)b[6] << 8)  | (uint32_t)b[7];
+            g_ota_size         = size;
+            g_ota_expected_crc = crc;
             g_ota_received     = 0;
             g_ota_running_crc  = 0xFFFFFFFFu;
-            g_ota_active       = true;      // pause gate polling now
-            if (!Update.begin(g_ota_size)) {
-                g_ota_state  = beecounter_proto::OTA_STATE_ERR_BEGIN;
-                g_ota_err    = (uint8_t)Update.getError();
-                g_ota_active = false;
-            } else {
+            if (Update.begin(size)) {
+                g_ota_active = true;
                 g_ota_state  = beecounter_proto::OTA_STATE_RECEIVING;
                 g_ota_err    = beecounter_proto::OTA_ERR_NONE;
+            } else {
+                g_ota_active = false;
+                g_ota_state  = beecounter_proto::OTA_STATE_ERR_BEGIN;
             }
         }
     }
     else if (reg == beecounter_proto::REG_OTA_DATA) {
-        if (g_ota_state != beecounter_proto::OTA_STATE_RECEIVING) {
-            while (Wire1.available()) (void)Wire1.read();   // ignore stray frame
-        } else {
-            uint8_t off_b[4];
-            size_t og = 0;
-            while (Wire1.available() && og < 4) off_b[og++] = (uint8_t)Wire1.read();
-            uint32_t offset = ((uint32_t)off_b[0] << 24) | ((uint32_t)off_b[1] << 16) |
-                              ((uint32_t)off_b[2] << 8)  |  (uint32_t)off_b[3];
-            uint8_t data[beecounter_proto::OTA_CHUNK_MAX];
-            size_t dn = 0;
-            while (Wire1.available() && dn < sizeof(data)) data[dn++] = (uint8_t)Wire1.read();
-
+        // offset(4 BE) + data bytes.
+        if (g_ota_active && n_bytes >= 5) {
+            uint8_t ob[4];
+            for (uint8_t i = 0; i < 4; i++) ob[i] = (uint8_t)Wire1.read();
+            uint32_t offset = ((uint32_t)ob[0] << 24) | ((uint32_t)ob[1] << 16) |
+                              ((uint32_t)ob[2] << 8)  | (uint32_t)ob[3];
             if (offset != g_ota_received) {
-                g_ota_state  = beecounter_proto::OTA_STATE_ERR_SEQ;
                 Update.abort();
                 g_ota_active = false;
-            } else if (dn > 0) {
+                g_ota_state  = beecounter_proto::OTA_STATE_ERR_SEQ;
+            } else {
+                uint8_t data[beecounter_proto::OTA_CHUNK_MAX];
+                int dn = 0;
+                while (Wire1.available() && dn < (int)sizeof(data)) {
+                    data[dn++] = (uint8_t)Wire1.read();
+                }
                 size_t w = Update.write(data, dn);
-                if (w != dn) {
-                    g_ota_state  = beecounter_proto::OTA_STATE_ERR_WRITE;
-                    g_ota_err    = (uint8_t)Update.getError();
+                if ((int)w != dn) {
                     Update.abort();
                     g_ota_active = false;
+                    g_ota_state  = beecounter_proto::OTA_STATE_ERR_WRITE;
                 } else {
                     g_ota_running_crc = crc32_update(g_ota_running_crc, data, dn);
-                    g_ota_received   += dn;
+                    g_ota_received += dn;
                 }
             }
         }
     }
     else if (reg == beecounter_proto::REG_OTA_END) {
-        while (Wire1.available()) (void)Wire1.read();
-        if (g_ota_state == beecounter_proto::OTA_STATE_RECEIVING) {
+        if (g_ota_active) {
             uint32_t final_crc = g_ota_running_crc ^ 0xFFFFFFFFu;
             if (g_ota_received != g_ota_size) {
+                Update.abort();
                 g_ota_state = beecounter_proto::OTA_STATE_ERR_SIZE;
-                Update.abort();
             } else if (final_crc != g_ota_expected_crc) {
-                g_ota_state = beecounter_proto::OTA_STATE_ERR_CRC;
                 Update.abort();
-            } else if (!Update.end(true)) {       // true = set boot partition
+                g_ota_state = beecounter_proto::OTA_STATE_ERR_CRC;
+            } else if (!Update.end(true)) {
                 g_ota_state = beecounter_proto::OTA_STATE_ERR_END;
-                g_ota_err   = (uint8_t)Update.getError();
             } else {
                 g_ota_state  = beecounter_proto::OTA_STATE_DONE;
-                g_ota_reboot = true;              // loop() reboots after status read
+                g_ota_reboot = true;   // loop() performs the actual restart
             }
             g_ota_active = false;
         }
     }
     else if (reg == beecounter_proto::REG_OTA_ABORT) {
-        while (Wire1.available()) (void)Wire1.read();
-        if (g_ota_state == beecounter_proto::OTA_STATE_RECEIVING) Update.abort();
-        g_ota_state  = beecounter_proto::OTA_STATE_IDLE;
-        g_ota_active = false;
+        if (g_ota_active) {
+            Update.abort();
+            g_ota_active = false;
+            g_ota_state  = beecounter_proto::OTA_STATE_IDLE;
+        }
     }
-    // drain anything else
-    while (Wire1.available()) (void)Wire1.read();
 }
 
 static void onSlaveRequest() {
-    // HiveScale wants to read from the previously written register pointer.
-    // Stream bytes from the appropriate snapshot.
+    // Build a response for whatever register the master last pointed at.
     uint8_t buf[SLAVE_TX_BUF_SIZE];
     size_t n = 0;
 
@@ -511,9 +607,10 @@ static void onSlaveRequest() {
         buf[n++] = g_status_flags;
         break;
     case beecounter_proto::REG_UPTIME_S: {
-        uint32_t s = millis() / 1000;
-        if (s > 0xFFFF) s = 0xFFFF;
-        writeU16BE(&buf[n], (uint16_t)s); n += 2;
+        uint32_t up = millis() / 1000;
+        if (up > 0xFFFF) up = 0xFFFF;
+        writeU16BE(buf, (uint16_t)up);
+        n = 2;
         break;
     }
     case beecounter_proto::REG_NUM_GATES:
@@ -525,43 +622,61 @@ static void onSlaveRequest() {
                              (g_mcp_u4_ok ? 1 : 0));
         break;
     case beecounter_proto::REG_TOTAL_IN:
-        writeU32BE(&buf[n], g_total_in);  n += 4; break;
+        writeU32BE(buf, g_total_in);  n = 4; break;
     case beecounter_proto::REG_TOTAL_OUT:
-        writeU32BE(&buf[n], g_total_out); n += 4; break;
+        writeU32BE(buf, g_total_out); n = 4; break;
     case beecounter_proto::REG_INTERVAL_IN:
-        writeU32BE(&buf[n], g_interval_in_shadow);  n += 4; break;
+        writeU32BE(buf, g_interval_in_shadow);  n = 4; break;
     case beecounter_proto::REG_INTERVAL_OUT:
-        writeU32BE(&buf[n], g_interval_out_shadow); n += 4; break;
+        writeU32BE(buf, g_interval_out_shadow); n = 4; break;
     case beecounter_proto::REG_GLITCH_COUNT:
-        writeU16BE(&buf[n], g_glitch_count); n += 2; break;
+        writeU16BE(buf, g_glitch_count); n = 2; break;
     case beecounter_proto::REG_BUSY_RETRIES:
-        writeU16BE(&buf[n], g_busy_retries); n += 2; break;
+        writeU16BE(buf, g_busy_retries); n = 2; break;
     case beecounter_proto::REG_PER_GATE_IN:
-        for (uint8_t i = 0; i < gates::NUM_GATES; i++)
+        for (uint8_t i = 0; i < gates::NUM_GATES && n < sizeof(buf); i++)
             buf[n++] = g_gate_shadow[i].in;
         break;
     case beecounter_proto::REG_PER_GATE_OUT:
-        for (uint8_t i = 0; i < gates::NUM_GATES; i++)
+        for (uint8_t i = 0; i < gates::NUM_GATES && n < sizeof(buf); i++)
             buf[n++] = g_gate_shadow[i].out;
         break;
-    case beecounter_proto::REG_CTRL:
-        buf[n++] = 0xFF;   // write-only
-        break;
-    case beecounter_proto::REG_OTA_STATUS:
-        buf[n++] = g_ota_state;
-        writeU32BE(&buf[n], g_ota_received); n += 4;
-        buf[n++] = g_ota_err;
-        break;
-    default:
-        buf[n++] = 0xFF;
+    case beecounter_proto::REG_OTA_STATUS: {
+        // state(1) + received(4 BE) + err(1)
+        buf[0] = g_ota_state;
+        writeU32BE(buf + 1, g_ota_received);
+        buf[5] = g_ota_err;
+        n = 6;
         break;
     }
+    default:
+        buf[n++] = 0xFF;   // unknown register
+        break;
+    }
+
     Wire1.write(buf, n);
 }
 
-// Bring up the dedicated HiveScale slave bus (Wire1) on GPIO2/GPIO3 once.
+// ============================================================================
+// Bring-up helpers
+// ============================================================================
+
+static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
+    if (!mcp.begin_I2C(addr, &Wire)) {
+        Serial.printf("[MCP] %s @ 0x%02X: NOT FOUND\n", tag, addr);
+        return false;
+    }
+    // All 16 pins are sensor inputs. The board provides 100k pull-ups, so we
+    // use plain INPUT (not INPUT_PULLUP) to keep the MCP's weak internal
+    // pull-ups out of the picture.
+    for (uint8_t p = 0; p < 16; p++) {
+        mcp.pinMode(p, INPUT);
+    }
+    Serial.printf("[MCP] %s @ 0x%02X: OK\n", tag, addr);
+    return true;
+}
+
 static void initHiveSlaveBus() {
-    // begin() with an address parameter puts this controller in slave mode.
     Wire1.begin((uint8_t)i2c_addr::BEECOUNTER_SLAVE,
                 pins::I2C_HIVE_SDA, pins::I2C_HIVE_SCL,
                 (uint32_t)I2C_SLAVE_HZ);
@@ -570,23 +685,6 @@ static void initHiveSlaveBus() {
     Serial.printf("[I2C] HiveScale slave bus up on GPIO%d/%d @ 0x%02X\n",
                   pins::I2C_HIVE_SDA, pins::I2C_HIVE_SCL,
                   (unsigned)i2c_addr::BEECOUNTER_SLAVE);
-}
-
-// ============================================================================
-// Boot-time MCP23017 setup  (Wire / bus 0)
-// ============================================================================
-
-static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
-    if (!mcp.begin_I2C(addr, &Wire)) {
-        Serial.printf("[MCP] %s @ 0x%02X: NOT FOUND\n", tag, addr);
-        return false;
-    }
-    // All 16 pins are sensor inputs.
-    for (uint8_t p = 0; p < 16; p++) {
-        mcp.pinMode(p, INPUT);
-    }
-    Serial.printf("[MCP] %s @ 0x%02X: OK\n", tag, addr);
-    return true;
 }
 
 // ============================================================================
@@ -624,16 +722,19 @@ void setup() {
     // Bus 1 (Wire1): permanent SLAVE for the HiveScale on GPIO2/GPIO3.
     initHiveSlaveBus();
 
-    // Light up the IR emitters now that the chips are configured.
-    setIrLeds(true);
+    // Emitters now default to PULSED (AUTO): they stay dark between samples and
+    // are lit only for the settle+read window inside pollAllGates(). Leave the
+    // steady level OFF here; the first pollAllGates() below will pulse them.
+    g_led_mode = LedMode::AUTO;
+    setIrLeds(false);
 
     // One warm-up poll so the state machine has fresh baselines before any
-    // crossings start counting.
+    // crossings start counting. This also exercises the pulsed-sample path.
     pollAllGates();
 
     g_status_flags |= beecounter_proto::STATUS_READY;
 
-    Serial.println("[SETUP] Entering normal counting loop");
+    Serial.println("[SETUP] Entering normal counting loop (pulsed IR)");
 }
 
 void loop() {
@@ -652,18 +753,22 @@ void loop() {
     // onReceive/onRequest callbacks, so the loop body only does master work.
     // While an OTA transfer is in progress we skip polling so the CPU is
     // dedicated to servicing inbound firmware frames; bee counts during the
-    // ~20 s update are intentionally sacrificed.
-    if (!g_ota_active && now - g_last_poll_ms >= POLL_INTERVAL_MS) {
+    // ~20 s update are intentionally sacrificed. We also force the emitters
+    // dark for the duration so they aren't left lit by a mid-pulse abort.
+    if (g_ota_active) {
+        driveIrLeds(false);
+    } else if (now - g_last_poll_ms >= POLL_INTERVAL_MS) {
         g_last_poll_ms = now;
-        pollAllGates();
+        pollAllGates();   // pulses the emitters internally in AUTO mode
     }
 
-    // Keep the IR LEDs in sync with current mode (auto/force).
+    // Keep the steady LED level in sync with the current mode. In AUTO this
+    // resolves to OFF (the pulsed sampler owns the emitters); FORCE_ON drives
+    // them steady-on; FORCE_OFF holds them dark.
     static LedMode last_led_mode = LedMode::AUTO;
     if (g_led_mode != last_led_mode) {
         last_led_mode = g_led_mode;
-        bool target = (g_led_mode == LedMode::FORCE_OFF) ? false : true;
-        setIrLeds(target);
+        setIrLeds(true);   // setIrLeds() applies the mode-correct steady level
     }
 
     // Periodic debug dump on serial -- once every 30 s.

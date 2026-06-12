@@ -33,8 +33,7 @@ The IR emitters are split into two banks driven by IRLB8721 N-channel MOSFETs:
 - **LED_BANK_1** — gates 00..13, FET driven by ESP32-C6 GPIO8 (silk "D8")
 - **LED_BANK_2** — gates 14..27, FET driven by ESP32-C6 GPIO9 (silk "D9")
 
-Driving the GPIO HIGH turns the bank's emitters on. They are left on
-continuously while counting (`LedMode::AUTO`).
+Driving the GPIO HIGH turns the bank's emitters on. In the default `LedMode::AUTO` the emitters are **pulsed**: both banks are lit only for the settle + MCP-read window of each poll (~1.75 ms at 100 kHz), then switched off until the next poll. This drops the emitter duty cycle from 100% to roughly 35% at  the default 5 ms poll interval, cutting average emitter current proportionally, with no change to detection behaviour. `CMD_LEDS_ON` forces the old always-on behaviour for bench work; `CMD_LEDS_OFF` blacks them out; `CMD_LEDS_AUTO` returns to pulsed mode.
 
 ### Counting
 
@@ -214,6 +213,8 @@ All the knobs are at the top of `src/main.cpp`:
 | `SENSOR_STUCK_MS`         | 30000   | After this many ms continuously blocked, fault flag is raised |
 | `I2C_MASTER_HZ`           | 100000  | Bus 0 (MCP) clock. 400 kHz is the MCP spec limit; 100 kHz is the safe default |
 | `I2C_SLAVE_HZ`            | 100000  | Bus 1 controller rate (as a slave, the C6 follows the master's clock) |
+| `LED_SETTLE_US`           | 250     | IR emitter settle time before each pulsed read. Lower = less power but risks reading stale "clear" levels if shorter than the real phototransistor settle time. |
+
 
 If your hive has unusually long entrance tunnels or slow-moving bees, raise
 `GATE_PAIRING_WINDOW_MS`. If you see noise events on `GLITCH_COUNT`, raise
@@ -246,3 +247,9 @@ If any MCP shows `NOT FOUND`, check:
 
 After boot, breaking a gate's beam (e.g. with a piece of paper) should
 trigger a serial counter increase on the next 30 s status dump.
+
+The final boot line now reads:
+
+```
+[SETUP] Entering normal counting loop (pulsed IR)
+```
