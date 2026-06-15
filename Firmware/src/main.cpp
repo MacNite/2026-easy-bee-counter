@@ -502,6 +502,7 @@ static void irDebugPrintHelp() {
     Serial.println(F("[IR-DEBUG] interactive sensor console — commands:"));
     Serial.println(F("  r  read & print all 24 gates once"));
     Serial.println(F("  s  toggle continuous streaming (~200 ms)"));
+    Serial.println(F("  i  scan the master I2C bus for devices"));
     Serial.println(F("  1  force IR LEDs ON (steady)"));
     Serial.println(F("  0  force IR LEDs OFF"));
     Serial.println(F("  a  IR LEDs AUTO (pulsed, normal mode)"));
@@ -542,6 +543,29 @@ static void irDebugReadAndPrint() {
     }
 }
 
+// Probe every 7-bit address on the master bus (Wire) and report what ACKs.
+// This is the quickest way to tell a wiring/pin fault (nothing responds) from
+// an address-strap fault (something responds, but not at the expected 0x20).
+static void irDebugI2cScan() {
+    Serial.println(F("[IR-DEBUG] scanning master I2C bus (Wire / SDA,SCL in pins.h)..."));
+    uint8_t found = 0;
+    for (uint8_t addr = 1; addr < 127; addr++) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf("  device ACK at 0x%02X\n", addr);
+            found++;
+        }
+    }
+    if (found == 0) {
+        Serial.println(F("  no devices responded."));
+        Serial.println(F("  -> check: SDA/SCL not swapped, pull-ups to 3V3, "
+                         "MCP /RESET high, common GND, A0/A1/A2 strapped"));
+    } else {
+        Serial.printf("  %u device(s) total. Expected MCP23017s at "
+                      "0x20/0x21/0x22.\n", found);
+    }
+}
+
 // Drain any pending serial input and service streaming. Called from loop().
 static void irDebugPoll() {
     while (Serial.available() > 0) {
@@ -554,6 +578,9 @@ static void irDebugPoll() {
             g_dbg_stream  = !g_dbg_stream;
             g_dbg_last_ms = 0;   // stream immediately on enable
             Serial.printf("[IR-DEBUG] streaming %s\n", g_dbg_stream ? "ON" : "OFF");
+            break;
+        case 'i':
+            irDebugI2cScan();
             break;
         case '1':
             g_led_mode = LedMode::FORCE_ON;
