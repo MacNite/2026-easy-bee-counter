@@ -89,15 +89,15 @@
 namespace pins {
 
 // Bus 0 (Wire) — master to the MCP23017s.
-constexpr int I2C_SDA           = 3;   // U5 D4 / silk "D4" -> /SDA net
-constexpr int I2C_SCL           = 4;   // U5 D5 / silk "D5" -> /SDC net
+constexpr int I2C_SDA           = 2;   // U5 D4 / silk "D4" -> /SDA net
+constexpr int I2C_SCL           = 3;   // U5 D5 / silk "D5" -> /SDC net
 
 // Bus 1 (Wire1) — slave to the HiveScale.                        [NEW]
-constexpr int I2C_HIVE_SDA      = 1;   // U5 D2 / silk "D2" -> SDA_HiveScale
-constexpr int I2C_HIVE_SCL      = 2;   // U5 D3 / silk "D3" -> SCL_HiveScale
+constexpr int I2C_HIVE_SDA      = 0;   // U5 D2 / silk "D2" -> SDA_HiveScale
+constexpr int I2C_HIVE_SCL      = 1;   // U5 D3 / silk "D3" -> SCL_HiveScale
 
-constexpr int IR_LED_BANK_1_EN  = 15;   // U5 D8 / silk "D8" -> Q1 gate -> gates 00..13
-constexpr int IR_LED_BANK_2_EN  = 18;   // U5 D9 / silk "D9" -> Q2 gate -> gates 14..27
+constexpr int IR_LED_BANK_1_EN  = 18;   // U5 D8 / silk "D8" -> Q1 gate -> gates 00..13
+constexpr int IR_LED_BANK_2_EN  = 19;   // U5 D9 / silk "D9" -> Q2 gate -> gates 14..27
 
 }  // namespace pins
 
