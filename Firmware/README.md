@@ -201,6 +201,37 @@ ESP32-C6-MINI-1 module on this PCB. USB CDC is enabled in `platformio.ini`, so
 
 ---
 
+## USB IR-sensor debug console (bench bring-up)
+
+For initial testing of the IR sensors over USB — with no HiveScale / I2C master
+attached — flash the dedicated debug environment instead of the production one:
+
+```bash
+pio run -e esp32-c6-devkitc-1-irdebug -t upload
+pio device monitor    # 115200 baud
+```
+
+This build is identical to production but compiles in an interactive serial
+console (gated behind `-DIR_DEBUG`, so it is **never** in the normal firmware).
+Press a single key in the serial monitor:
+
+| Key | Action                                                            |
+| --- | ---------------------------------------------------------------- |
+| `r` | Read & print all 24 gates' inner/outer beam state once          |
+| `s` | Toggle continuous streaming (~200 ms)                          |
+| `1` | Force IR LEDs ON (steady)                                       |
+| `0` | Force IR LEDs OFF                                               |
+| `a` | IR LEDs AUTO (normal pulsed mode)                              |
+| `h` | Show the command list                                          |
+
+Each reading lists the raw MCP23017 port words plus a per-gate `BLOCK`/`clear`
+line for the inner and outer sensor. The emitters are pulsed on for every read
+regardless of the LED mode, so the readout is always valid. Wave a finger or a
+bee through a gate and you should see that gate's `inner`/`outer` flip to
+`BLOCK`.
+
+---
+
 ## Tuning
 
 All the knobs are at the top of `src/main.cpp`:
