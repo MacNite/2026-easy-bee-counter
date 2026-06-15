@@ -474,6 +474,126 @@ static bool pollAllGates() {
 }
 
 // ============================================================================
+// USB serial IR-sensor debug console  (compile-time, -DIR_DEBUG only)
+// ============================================================================
+//
+// A tiny interactive console for bench bring-up: it lets you watch the raw
+// inner/outer beam state of all 24 gates over the USB CDC serial link without
+// any HiveScale / I2C master attached. It is intentionally excluded from the
+// production build — none of this code is compiled unless -DIR_DEBUG is set
+// (see the esp32-c6-devkitc-1-irdebug env in platformio.ini).
+//
+// Commands (single keypress in the serial monitor):
+//   r  read & print every gate's sensors once
+//   s  toggle continuous streaming (every DBG_STREAM_INTERVAL_MS)
+//   1  force IR LEDs ON   (steady)
+//   0  force IR LEDs OFF
+//   a  IR LEDs AUTO       (normal pulsed mode)
+//   h  print the command list
+// ============================================================================
+#ifdef IR_DEBUG
+
+static bool     g_dbg_stream  = false;
+static uint32_t g_dbg_last_ms = 0;
+static constexpr uint32_t DBG_STREAM_INTERVAL_MS = 200;
+
+static void irDebugPrintHelp() {
+    Serial.println();
+    Serial.println(F("[IR-DEBUG] interactive sensor console — commands:"));
+    Serial.println(F("  r  read & print all 24 gates once"));
+    Serial.println(F("  s  toggle continuous streaming (~200 ms)"));
+    Serial.println(F("  1  force IR LEDs ON (steady)"));
+    Serial.println(F("  0  force IR LEDs OFF"));
+    Serial.println(F("  a  IR LEDs AUTO (pulsed, normal mode)"));
+    Serial.println(F("  h  show this help"));
+    Serial.println();
+}
+
+// Take one fresh reading of all 24 gates and print it. The emitters are pulsed
+// on for the settle+read window regardless of the current LED mode, so the
+// readout is always valid on the bench even in AUTO/FORCE_OFF; afterwards the
+// mode-correct steady level is restored.
+static void irDebugReadAndPrint() {
+    driveIrLeds(true);
+    delayMicroseconds(LED_SETTLE_US);
+    uint16_t v_u2 = 0, v_u3 = 0, v_u4 = 0;
+    bool ok = readAllMcp(v_u2, v_u3, v_u4);
+    setIrLeds(true);   // restore mode-correct steady level (OFF in AUTO)
+
+    auto getBit = [](uint16_t v, uint8_t pin) -> bool { return (v >> pin) & 0x1; };
+
+    Serial.printf("[IR] t=%lus raw U2=0x%04X U3=0x%04X U4=0x%04X read_ok=%d\n",
+                  (unsigned long)(millis() / 1000), v_u2, v_u3, v_u4, ok ? 1 : 0);
+    for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
+        const auto& loc = gates::TABLE[i];
+        uint16_t v;
+        switch (loc.mcp_address) {
+        case i2c_addr::MCP_GATES_00_07: v = v_u2; break;
+        case i2c_addr::MCP_GATES_10_17: v = v_u3; break;
+        case i2c_addr::MCP_GATES_20_27: v = v_u4; break;
+        default: continue;
+        }
+        // BLOCKED == beam reflected/interrupted == sensor line LOW (bit 0).
+        bool inner_blocked = !getBit(v, loc.inner_pin);
+        bool outer_blocked = !getBit(v, loc.outer_pin);
+        Serial.printf("  %-8s inner:%-5s outer:%-5s\n", loc.tag,
+                      inner_blocked ? "BLOCK" : "clear",
+                      outer_blocked ? "BLOCK" : "clear");
+    }
+}
+
+// Drain any pending serial input and service streaming. Called from loop().
+static void irDebugPoll() {
+    while (Serial.available() > 0) {
+        int c = Serial.read();
+        switch (c) {
+        case 'r':
+            irDebugReadAndPrint();
+            break;
+        case 's':
+            g_dbg_stream  = !g_dbg_stream;
+            g_dbg_last_ms = 0;   // stream immediately on enable
+            Serial.printf("[IR-DEBUG] streaming %s\n", g_dbg_stream ? "ON" : "OFF");
+            break;
+        case '1':
+            g_led_mode = LedMode::FORCE_ON;
+            setIrLeds(true);
+            Serial.println(F("[IR-DEBUG] IR LEDs -> FORCE_ON"));
+            break;
+        case '0':
+            g_led_mode = LedMode::FORCE_OFF;
+            setIrLeds(false);
+            Serial.println(F("[IR-DEBUG] IR LEDs -> FORCE_OFF"));
+            break;
+        case 'a':
+            g_led_mode = LedMode::AUTO;
+            setIrLeds(false);
+            Serial.println(F("[IR-DEBUG] IR LEDs -> AUTO (pulsed)"));
+            break;
+        case 'h':
+        case '?':
+            irDebugPrintHelp();
+            break;
+        case '\r':
+        case '\n':
+        case ' ':
+            break;   // ignore whitespace/line endings
+        default:
+            Serial.printf("[IR-DEBUG] unknown key '%c' — press 'h' for help\n",
+                          (char)c);
+            break;
+        }
+    }
+
+    if (g_dbg_stream && millis() - g_dbg_last_ms >= DBG_STREAM_INTERVAL_MS) {
+        g_dbg_last_ms = millis();
+        irDebugReadAndPrint();
+    }
+}
+
+#endif  // IR_DEBUG
+
+// ============================================================================
 // I2C slave (Wire1) callbacks — registered once in setup(), never torn down
 // ============================================================================
 
@@ -735,6 +855,11 @@ void setup() {
     g_status_flags |= beecounter_proto::STATUS_READY;
 
     Serial.println("[SETUP] Entering normal counting loop (pulsed IR)");
+
+#ifdef IR_DEBUG
+    Serial.println("[SETUP] IR_DEBUG build — USB sensor console enabled");
+    irDebugPrintHelp();
+#endif
 }
 
 void loop() {
@@ -747,6 +872,11 @@ void loop() {
     }
 
     const uint32_t now = millis();
+
+#ifdef IR_DEBUG
+    // Service the USB serial sensor console (bench bring-up builds only).
+    irDebugPoll();
+#endif
 
     // ---- Master work: poll the MCP23017s every POLL_INTERVAL_MS ----
     // The HiveScale slave bus (Wire1) is serviced asynchronously by its
