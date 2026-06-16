@@ -70,7 +70,12 @@
         }
       },
       "diff_pair_dimensions": [],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        [
+          "lib_footprint_mismatch|106500000|236500000|b5771fa5-d8ea-45a3-90af-6252d5114802|00000000-0000-0000-0000-000000000000",
+          "only modified silkscreen"
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -523,7 +528,7 @@
         "pcb_color": "rgb(255, 101, 147)",
         "priority": 0,
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 1.0,
+        "track_width": 0.5,
         "tuning_profile": "",
         "via_diameter": 0.8,
         "via_drill": 0.6
@@ -697,7 +702,7 @@
         "uuid": "84e96d39-b501-4ae7-b37a-cc3ea4539e19"
       }
     ],
-    "used_designators": "H1-9",
+    "used_designators": "RN9\\-100k1,RN8\\-100k1,RN6\\-100k1,RN5\\-100k1,RN1\\-100k1",
     "variants": []
   },
   "sheets": [

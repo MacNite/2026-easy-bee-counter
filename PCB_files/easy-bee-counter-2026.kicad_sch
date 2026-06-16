@@ -3585,6 +3585,12 @@
 		(uuid "89c0a9a3-b3c0-415d-a40f-b6f4e4227799")
 	)
 	(junction
+		(at 50.8 119.38)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "a2bbd258-4212-4213-98f7-6bf7ed736482")
+	)
+	(junction
 		(at 212.09 326.39)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4358,6 +4364,16 @@
 	)
 	(wire
 		(pts
+			(xy 49.53 119.38) (xy 50.8 119.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "39721646-fd05-4657-a3aa-ccc30795ac77")
+	)
+	(wire
+		(pts
 			(xy 335.28 76.2) (xy 323.85 76.2)
 		)
 		(stroke
@@ -5075,6 +5091,16 @@
 			(type default)
 		)
 		(uuid "79accdce-e078-47fa-bac8-a66fdd82384a")
+	)
+	(wire
+		(pts
+			(xy 50.8 119.38) (xy 54.61 119.38)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "7b7b6033-f155-4f23-9b1c-4d8fd54fda02")
 	)
 	(wire
 		(pts
@@ -6466,26 +6492,6 @@
 		)
 		(uuid "ff046c5a-5cea-433f-904c-84db75eee65c")
 	)
-	(label "LED_BANK_2"
-		(at 410.21 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "00cf4099-5783-4e9e-8220-368d1bab8f73")
-	)
-	(label "LED_BANK_1"
-		(at 229.87 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "00d08ca2-2aa7-4867-9766-b18b2980664b")
-	)
 	(label "SDA"
 		(at 130.81 195.58 180)
 		(effects
@@ -6505,16 +6511,6 @@
 			(justify left bottom)
 		)
 		(uuid "01a32e86-4c3f-4993-ba01-bfcecedcfdb2")
-	)
-	(label "LED_BANK_1"
-		(at 308.61 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "023d4ffb-18fe-42bf-85e8-6c64b4fca0f8")
 	)
 	(label "GATE_10_OUT"
 		(at 166.37 195.58 0)
@@ -6565,26 +6561,6 @@
 			(justify left bottom)
 		)
 		(uuid "0ce5422c-7de6-48ff-af9e-5b1419a493e8")
-	)
-	(label "LED_BANK_1"
-		(at 340.36 214.63 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "0d070ef8-9f7b-4fd8-ac4c-26fd68fc239b")
-	)
-	(label "LED_BANK_1"
-		(at 229.87 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "0de1f85b-4045-4482-9673-e72575efffea")
 	)
 	(label "GATE_12_OUT"
 		(at 166.37 200.66 0)
@@ -6646,26 +6622,6 @@
 		)
 		(uuid "159c6c1a-f9a6-472b-bcad-e806afbaec84")
 	)
-	(label "LED_BANK_2"
-		(at 307.34 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "15da1221-8e26-4490-be0c-cfceeae5ea6f")
-	)
-	(label "LED_BANK_2"
-		(at 346.71 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "15eb0fa6-705c-456b-bb09-b400b52bb1fd")
-	)
 	(label "GATE_10_IN"
 		(at 166.37 218.44 0)
 		(effects
@@ -6686,16 +6642,6 @@
 		)
 		(uuid "1685ef01-8bc3-47df-95fa-e8c84eed91af")
 	)
-	(label "LED_BANK_2"
-		(at 482.6 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "1799d0f0-760c-4e01-9a8a-10bcd69cff13")
-	)
 	(label "GATE_25_OUT"
 		(at 464.82 339.09 0)
 		(effects
@@ -6705,16 +6651,6 @@
 			(justify left bottom)
 		)
 		(uuid "194cb8a0-a4a1-4862-ba6a-62e6e22fbb0d")
-	)
-	(label "LED_BANK_1"
-		(at 340.36 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "1dfba475-b8c0-4a5d-bc08-f673738b1a6d")
 	)
 	(label "GATE_23_OUT"
 		(at 361.95 339.09 0)
@@ -6826,16 +6762,6 @@
 		)
 		(uuid "315c983b-bac1-4ebd-aa0a-1e10d9870759")
 	)
-	(label "LED_BANK_2"
-		(at 449.58 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "348ec572-a34f-42ce-8e63-d9306de11ae2")
-	)
 	(label "GPIO4"
 		(at 48.26 73.66 270)
 		(effects
@@ -6845,6 +6771,16 @@
 			(justify right bottom)
 		)
 		(uuid "352a97e4-69a7-4db7-81cb-30b376f066e3")
+	)
+	(label "SDA_HiveScale"
+		(at 44.45 205.74 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "39bd0b9b-6376-4a6c-9fbc-10955fe528bb")
 	)
 	(label "GATE_11_IN"
 		(at 166.37 220.98 0)
@@ -6916,16 +6852,6 @@
 		)
 		(uuid "45b8be45-dd28-4fdd-8fb7-660b759a5b37")
 	)
-	(label "LED_BANK_2"
-		(at 528.32 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "48d31438-3966-416c-950f-5df4b63974fa")
-	)
 	(label "GATE_00_OUT"
 		(at 245.11 76.2 0)
 		(effects
@@ -6936,16 +6862,6 @@
 		)
 		(uuid "4e818f1f-ac12-4b28-b822-0e4066970c43")
 	)
-	(label "LED_BANK_1"
-		(at 308.61 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "4f06393a-480c-4f7a-883f-25883ac81137")
-	)
 	(label "GATE_15_OUT"
 		(at 166.37 208.28 0)
 		(effects
@@ -6955,26 +6871,6 @@
 			(justify left bottom)
 		)
 		(uuid "51179c18-3d0e-4414-bcc0-381d28b4451f")
-	)
-	(label "LED_BANK_1"
-		(at 490.22 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "51668e69-d970-485e-be11-f4b7227b6eac")
-	)
-	(label "LED_BANK_1"
-		(at 450.85 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "53282c16-9894-409a-8714-edd4b3a6f81f")
 	)
 	(label "GATE_00_IN"
 		(at 167.64 74.93 0)
@@ -6996,16 +6892,6 @@
 		)
 		(uuid "584b2552-0db5-48a2-8ea5-319c359bc2b9")
 	)
-	(label "LED_BANK_2"
-		(at 410.21 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "59324d0c-4201-47fe-932d-b0ca24e47648")
-	)
 	(label "GATE_03_OUT"
 		(at 363.22 76.2 0)
 		(effects
@@ -7016,16 +6902,6 @@
 		)
 		(uuid "59e5ac60-e422-4c94-9543-52289ef6e874")
 	)
-	(label "LED_BANK_1"
-		(at 222.25 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "5ca54a8b-db9f-4459-bc5e-22293a907d36")
-	)
 	(label "GATE_16_IN"
 		(at 166.37 233.68 0)
 		(effects
@@ -7035,16 +6911,6 @@
 			(justify left bottom)
 		)
 		(uuid "5e82d438-ad92-4f72-a084-0eb7770f8710")
-	)
-	(label "LED_BANK_2"
-		(at 521.97 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "5f4b48ce-dced-4618-aa36-02d013a6ee1a")
 	)
 	(label "GATE_13_OUT"
 		(at 355.6 214.63 0)
@@ -7076,25 +6942,15 @@
 		)
 		(uuid "64c477d7-7dd2-4a65-8fea-a29628b19419")
 	)
-	(label "LED_BANK_2"
-		(at 307.34 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "656b8c29-8ca1-47cf-b134-7b7be9640837")
-	)
 	(label "LED_BANK_1"
-		(at 261.62 214.63 180)
+		(at 198.12 46.99 180)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify right bottom)
 		)
-		(uuid "6674c6d6-623e-41de-8d8f-0292c9af90d2")
+		(uuid "67e751fe-a762-435d-9b7a-3ea612f1ac2f")
 	)
 	(label "GATE_17_OUT"
 		(at 166.37 213.36 0)
@@ -7136,16 +6992,6 @@
 		)
 		(uuid "6b26ea16-fc57-43a2-b0c9-095b05e67980")
 	)
-	(label "LED_BANK_2"
-		(at 482.6 214.63 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "6b773354-844a-4b7b-ad62-cefb39df25e1")
-	)
 	(label "GATE_15_IN"
 		(at 166.37 231.14 0)
 		(effects
@@ -7176,15 +7022,15 @@
 		)
 		(uuid "6cc21da8-9774-4006-92f6-c92be49090b5")
 	)
-	(label "LED_BANK_1"
-		(at 411.48 76.2 180)
+	(label "SDA_HiveScale"
+		(at 69.85 40.64 270)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify right bottom)
 		)
-		(uuid "6ef37407-1f3a-4483-baa5-a17f4c455bfa")
+		(uuid "70aeb51e-1984-429e-8786-8348551a6a02")
 	)
 	(label "LED_BANK_1"
 		(at 60.96 60.96 0)
@@ -7195,6 +7041,16 @@
 			(justify left bottom)
 		)
 		(uuid "716c0919-9bb0-457c-aa0d-62aef8586933")
+	)
+	(label "SCL_HiveScale"
+		(at 44.45 208.28 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "71f2163d-9f20-468e-8bb1-08058f885cfd")
 	)
 	(label "GATE_14_IN"
 		(at 419.1 196.85 0)
@@ -7225,16 +7081,6 @@
 			(justify left bottom)
 		)
 		(uuid "734478b2-9eef-4031-a076-2feaa86f6518")
-	)
-	(label "LED_BANK_2"
-		(at 488.95 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "744a4e10-aefa-4634-aba8-359ec648e5ab")
 	)
 	(label "GATE_14_OUT"
 		(at 166.37 205.74 0)
@@ -7306,16 +7152,6 @@
 		)
 		(uuid "8458200f-720f-4db2-9cb6-ed55dc8f2be2")
 	)
-	(label "LED_BANK_2"
-		(at 228.6 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "862fb1e8-4f97-46aa-a1a9-04f9f332010f")
-	)
 	(label "GATE_12_IN"
 		(at 316.23 196.85 0)
 		(effects
@@ -7335,6 +7171,16 @@
 			(justify left bottom)
 		)
 		(uuid "875f7f21-cf84-49c5-bfb4-076dfb78cd8a")
+	)
+	(label "LED_BANK_3"
+		(at 62.23 114.3 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "8aa3093e-6089-4105-8021-811fc5eef3d4")
 	)
 	(label "GATE_11_OUT"
 		(at 166.37 198.12 0)
@@ -7386,26 +7232,6 @@
 		)
 		(uuid "920412bd-89e4-4e31-a52f-834e16d0ecc4")
 	)
-	(label "LED_BANK_1"
-		(at 300.99 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "954813ac-beb1-4741-b050-07df0eb8e0e3")
-	)
-	(label "LED_BANK_1"
-		(at 450.85 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "9583d5a6-09fb-4985-a1e2-15d6a155981f")
-	)
 	(label "GATE_02_IN"
 		(at 323.85 58.42 0)
 		(effects
@@ -7415,16 +7241,6 @@
 			(justify left bottom)
 		)
 		(uuid "95a2c3e9-3322-40e8-8246-1398d2a11614")
-	)
-	(label "LED_BANK_2"
-		(at 521.97 214.63 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "98c4ec39-aeb0-4413-853f-b2a02dbd18c8")
 	)
 	(label "GATE_02_OUT"
 		(at 167.64 57.15 0)
@@ -7486,36 +7302,6 @@
 		)
 		(uuid "9d5054d0-8732-45a1-8bf4-e23182e0ebb7")
 	)
-	(label "LED_BANK_2"
-		(at 403.86 214.63 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "a1617bee-c141-4b48-adfc-84c79d5cc645")
-	)
-	(label "LED_BANK_2"
-		(at 403.86 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "a2a94f6f-e0da-4d86-a08b-c7274d664d0a")
-	)
-	(label "LED_BANK_1"
-		(at 411.48 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "a64ed75b-0c9b-49b4-ac85-1e14d2696226")
-	)
 	(label "GATE_26_IN"
 		(at 504.19 321.31 0)
 		(effects
@@ -7526,25 +7312,25 @@
 		)
 		(uuid "a9a469be-e957-404b-aaa7-accbe0de9daa")
 	)
-	(label "LED_BANK_2"
-		(at 443.23 214.63 180)
+	(label "LED_BANK_3"
+		(at 196.85 309.88 180)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify right bottom)
 		)
-		(uuid "ae1395a1-12fd-4830-8042-d7d735604cae")
+		(uuid "ad4e84a8-e84a-4fea-be6b-6e02ea17e471")
 	)
-	(label "LED_BANK_1"
-		(at 300.99 214.63 180)
+	(label "SCL_HiveScale"
+		(at 72.39 40.64 270)
 		(effects
 			(font
 				(size 1.27 1.27)
 			)
 			(justify right bottom)
 		)
-		(uuid "aeb5b688-c838-4f97-be3a-d23a91565ecd")
+		(uuid "af45735e-8864-4542-aa05-28797bd35963")
 	)
 	(label "GATE_04_IN"
 		(at 426.72 58.42 0)
@@ -7586,26 +7372,6 @@
 		)
 		(uuid "b769240b-1145-40b3-b546-380e11e9b40f")
 	)
-	(label "LED_BANK_1"
-		(at 269.24 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "b778b7b2-5364-424f-9b6b-31ef0269a6a5")
-	)
-	(label "LED_BANK_1"
-		(at 222.25 214.63 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "b7f7212f-43d3-459c-bca1-a3b7c66fcdb3")
-	)
 	(label "GATE_06_OUT"
 		(at 167.64 67.31 0)
 		(effects
@@ -7626,16 +7392,6 @@
 		)
 		(uuid "b920db96-c772-49db-a7e2-1ef25faea60b")
 	)
-	(label "LED_BANK_2"
-		(at 267.97 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "ba5957d3-b3de-4f0d-b1fc-7d01071d08d3")
-	)
 	(label "GATE_25_IN"
 		(at 464.82 321.31 0)
 		(effects
@@ -7646,16 +7402,6 @@
 		)
 		(uuid "bb6b9a3e-c90f-4b94-9394-afae5095984b")
 	)
-	(label "LED_BANK_2"
-		(at 488.95 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "bc3debd0-b5fc-4fae-af49-a8083bfdc970")
-	)
 	(label "SDA"
 		(at 102.87 158.75 0)
 		(effects
@@ -7665,6 +7411,16 @@
 			(justify left bottom)
 		)
 		(uuid "bc9948c6-2cc5-412a-87cf-6fbb12461ed1")
+	)
+	(label "GPIO6"
+		(at 49.53 127 270)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "bca47fbc-ea3b-452c-9492-0cc41364cd91")
 	)
 	(label "GATE_11_OUT"
 		(at 276.86 214.63 0)
@@ -7696,16 +7452,6 @@
 		)
 		(uuid "c232c5ce-c12f-40ec-92cb-e337fa3a4941")
 	)
-	(label "LED_BANK_2"
-		(at 228.6 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "c31fdd14-3845-48ac-a41b-f8cf920e0b06")
-	)
 	(label "GATE_14_IN"
 		(at 166.37 228.6 0)
 		(effects
@@ -7735,16 +7481,6 @@
 			(justify left bottom)
 		)
 		(uuid "c70ffcf0-9299-4412-b728-c0c6ecc8743f")
-	)
-	(label "LED_BANK_2"
-		(at 443.23 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "c7265542-2408-4548-90bf-ea776b20f176")
 	)
 	(label "GATE_25_IN"
 		(at 167.64 346.71 0)
@@ -7786,36 +7522,6 @@
 		)
 		(uuid "d20aa106-20db-44ca-9df7-1b089daa66e1")
 	)
-	(label "LED_BANK_2"
-		(at 528.32 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d2b295e7-6d16-4c16-a150-41f035dc5025")
-	)
-	(label "LED_BANK_2"
-		(at 449.58 321.31 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d34e3409-4a1e-420b-b09c-3436bc80dec6")
-	)
-	(label "LED_BANK_1"
-		(at 529.59 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d5ff79ee-9740-4504-88be-fbb17fd860ac")
-	)
 	(label "GATE_01_OUT"
 		(at 284.48 76.2 0)
 		(effects
@@ -7825,16 +7531,6 @@
 			(justify left bottom)
 		)
 		(uuid "d621abb8-9fbc-4ddc-ad13-69e90bd492ad")
-	)
-	(label "SDC"
-		(at 72.39 40.64 270)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "d67409b7-ec32-4772-bacb-1751dca0047c")
 	)
 	(label "GATE_07_OUT"
 		(at 544.83 76.2 0)
@@ -7846,16 +7542,6 @@
 		)
 		(uuid "da27ad86-72c3-46ff-a2a6-8284eaa9608a")
 	)
-	(label "SDA"
-		(at 69.85 40.64 270)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "da66118c-0cf6-4342-9f00-871479a321cc")
-	)
 	(label "GATE_23_OUT"
 		(at 167.64 318.77 0)
 		(effects
@@ -7865,16 +7551,6 @@
 			(justify left bottom)
 		)
 		(uuid "dbeb8900-6d0c-4787-be2b-c80e29a55343")
-	)
-	(label "LED_BANK_1"
-		(at 347.98 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "e05afa67-18af-4bb0-a86b-78ff96f577b6")
 	)
 	(label "GATE_10_IN"
 		(at 237.49 196.85 0)
@@ -7906,16 +7582,6 @@
 		)
 		(uuid "e568a6ba-af7d-40ba-9548-c88284877de8")
 	)
-	(label "LED_BANK_1"
-		(at 529.59 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "e7020b77-c7c9-48b1-ac35-34f73a985b5e")
-	)
 	(label "GATE_22_OUT"
 		(at 322.58 339.09 0)
 		(effects
@@ -7936,6 +7602,16 @@
 		)
 		(uuid "e8942214-17c6-4e40-8ea8-04e25caba4d0")
 	)
+	(label "GPIO6"
+		(at 80.01 210.82 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left bottom)
+		)
+		(uuid "e99d2a3d-240b-4ed1-948f-827014c4a4a8")
+	)
 	(label "GATE_26_OUT"
 		(at 167.64 326.39 0)
 		(effects
@@ -7945,16 +7621,6 @@
 			(justify left bottom)
 		)
 		(uuid "e9eb5823-eb07-4b6c-8ef7-6f2a9401e94f")
-	)
-	(label "LED_BANK_2"
-		(at 267.97 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "e9ed83f3-d176-483e-a8a2-9c06200ebb48")
 	)
 	(label "GATE_20_IN"
 		(at 167.64 334.01 0)
@@ -7976,26 +7642,6 @@
 		)
 		(uuid "ecca691e-52c4-4bbc-ac4b-720c6e33aa48")
 	)
-	(label "LED_BANK_1"
-		(at 269.24 76.2 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "ef63dc35-f922-461d-b720-bccbfb89add2")
-	)
-	(label "LED_BANK_1"
-		(at 347.98 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "ef83e6b8-5daa-4701-98dc-87e93a7bbbfa")
-	)
 	(label "GATE_04_OUT"
 		(at 426.72 76.2 0)
 		(effects
@@ -8016,16 +7662,6 @@
 		)
 		(uuid "f17c4772-5624-4ca5-b9f4-cebf8f20d2b2")
 	)
-	(label "LED_BANK_1"
-		(at 261.62 196.85 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "f399388e-4a82-4150-b945-9300fcba3622")
-	)
 	(label "GATE_05_IN"
 		(at 167.64 87.63 0)
 		(effects
@@ -8035,6 +7671,16 @@
 			(justify left bottom)
 		)
 		(uuid "f42bc285-5942-4eac-8f72-883f1352478c")
+	)
+	(label "LED_BANK_2"
+		(at 190.5 185.42 180)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right bottom)
+		)
+		(uuid "f62ee7be-0fe8-4e8d-92d7-fbe32ca5325f")
 	)
 	(label "GATE_07_OUT"
 		(at 167.64 69.85 0)
@@ -8046,16 +7692,6 @@
 		)
 		(uuid "f6acdb97-8fe5-4a56-9d9a-bc4cd203841b")
 	)
-	(label "LED_BANK_1"
-		(at 490.22 58.42 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "f81638c1-3148-42ac-9d7b-15550cf6c09c")
-	)
 	(label "GATE_13_IN"
 		(at 355.6 196.85 0)
 		(effects
@@ -8066,16 +7702,6 @@
 		)
 		(uuid "f834a4e2-fafb-4511-a50c-7857a5e811a7")
 	)
-	(label "LED_BANK_2"
-		(at 346.71 339.09 180)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify right bottom)
-		)
-		(uuid "fc3c3a8c-622f-4843-a721-9c2ba1fd6394")
-	)
 	(label "GATE_21_OUT"
 		(at 167.64 313.69 0)
 		(effects
@@ -8085,6 +7711,85 @@
 			(justify left bottom)
 		)
 		(uuid "fe94ce5a-72a8-4264-9264-7bea92d32507")
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 347.98 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "007bd1d0-a183-44c0-8f8d-b5073ebad97f")
+		(property "Reference" "#PWR0101"
+			(at 351.79 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 344.17 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 347.98 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 347.98 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 347.98 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "dbfe146d-93b8-4027-b629-b65a669981b5")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0101")
+					(unit 1)
+				)
+			)
+		)
 	)
 	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
@@ -8922,26 +8627,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "0d857505-8a7b-471e-9c35-07b90856323c")
-		(property "Reference" "RN1"
-			(at 203.4539 83.82 0)
+		(property "Reference" "RN1-100k1"
+			(at 204.724 80.01 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "100k Pullup1"
-			(at 205.9939 83.82 0)
+			(at 204.724 82.55 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -9007,7 +8710,7 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN1")
+					(reference "RN1-100k1")
 					(unit 1)
 				)
 			)
@@ -9094,6 +8797,164 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "Outer10")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 450.85 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "0f393bed-ea6b-4f95-8e6b-b9e66f8d9dee")
+		(property "Reference" "#PWR0105"
+			(at 454.66 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 447.04 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 450.85 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 450.85 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 450.85 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "d850e34a-7601-4b53-80e6-4c9a710d6c2b")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0105")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 347.98 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "0f9edcbe-5eff-442c-8906-35083f4516d3")
+		(property "Reference" "#PWR0100"
+			(at 351.79 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 344.17 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 347.98 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 347.98 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 347.98 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "86570375-35e3-4322-919a-965e9f480030")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0100")
 					(unit 1)
 				)
 			)
@@ -9251,6 +9112,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR014")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 443.23 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "130401fd-834d-4e00-905e-ffaddfc670ad")
+		(property "Reference" "#PWR0121"
+			(at 447.04 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 439.42 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 443.23 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 443.23 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 443.23 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8c830f4e-93b7-40f3-b5c0-043aeac826e0")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0121")
 					(unit 1)
 				)
 			)
@@ -9494,85 +9434,6 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "J1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "power:GND")
-		(at 198.12 46.99 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "1ae95aa7-e9c0-47a1-b68f-3e6d60c5afb5")
-		(property "Reference" "#PWR019"
-			(at 198.12 53.34 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 198.1199 50.8 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 198.12 46.99 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 198.12 46.99 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 198.12 46.99 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "9d4d83ac-16c5-451c-ab65-92cf987fc3a6")
-		)
-		(instances
-			(project "easy-bee-counter-2026"
-				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "#PWR019")
 					(unit 1)
 				)
 			)
@@ -10062,6 +9923,88 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 50.8 115.57 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "2a97e7c0-cb87-4c83-b1f5-c4ab6cc83e1b")
+		(property "Reference" "PD3"
+			(at 53.34 114.2999 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "R_10k"
+			(at 53.34 116.8399 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 49.022 115.57 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 115.57 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 50.8 115.57 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e313b487-3882-4092-bc4d-02dcecfaf4b0")
+		)
+		(pin "2"
+			(uuid "d22dec96-3e7a-4805-945c-055c32a9d1f6")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "PD3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 245.11 63.5 90)
 		(unit 1)
@@ -10141,85 +10084,6 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 190.5 185.42 0)
-		(unit 1)
-		(body_style 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(in_pos_files yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "2c6d66f1-c316-488d-a2e6-0069d92a280b")
-		(property "Reference" "#PWR054"
-			(at 190.5 191.77 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "GND"
-			(at 190.4999 189.23 90)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" ""
-			(at 190.5 185.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Datasheet" ""
-			(at 190.5 185.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 190.5 185.42 0)
-			(hide yes)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(pin "1"
-			(uuid "56fac509-418c-431d-8f05-fe2361565388")
-		)
-		(instances
-			(project "easy-bee-counter-2026"
-				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "#PWR054")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
 		(at 237.49 60.96 0)
 		(unit 1)
@@ -10229,7 +10093,6 @@
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
-		(fields_autoplaced yes)
 		(uuid "2d006820-52e7-4ba1-8dc8-71717bd57e1e")
 		(property "Reference" "Inner00"
 			(at 237.49 52.07 0)
@@ -10386,6 +10249,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "Inner17")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 346.71 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "323bde2b-b140-4b8c-8da7-9567a2adfd38")
+		(property "Reference" "#PWR0133"
+			(at 350.52 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 342.9 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 346.71 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 346.71 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 346.71 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "8b13377a-1e30-4207-9f71-7d737b425e8c")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0133")
 					(unit 1)
 				)
 			)
@@ -10622,6 +10564,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR071")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 269.24 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "3b34913f-3552-499e-becd-7904471242bb")
+		(property "Reference" "#PWR096"
+			(at 273.05 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 265.43 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 269.24 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 269.24 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 269.24 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "06e339df-ca6d-4386-a5db-36f2696cc070")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR096")
 					(unit 1)
 				)
 			)
@@ -11139,19 +11160,30 @@
 		)
 	)
 	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 38.1 135.89 0)
+		(lib_id "power:+3.3V")
+		(at 529.59 58.42 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom no)
+		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "43c42640-ef7f-4028-9e29-b19ae802a11a")
-		(property "Reference" "H3"
-			(at 40.64 134.6199 0)
+		(uuid "440a06e7-d2d8-4dc5-b44f-b6dfe0d1b665")
+		(property "Reference" "#PWR0108"
+			(at 533.4 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 525.78 58.4199 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -11161,19 +11193,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "MountingHole"
-			(at 40.64 137.1599 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 38.1 135.89 0)
+		(property "Footprint" ""
+			(at 529.59 58.42 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11184,7 +11205,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 38.1 135.89 0)
+			(at 529.59 58.42 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11194,8 +11215,8 @@
 				)
 			)
 		)
-		(property "Description" "Mounting Hole without connection"
-			(at 38.1 135.89 0)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 529.59 58.42 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11204,11 +11225,14 @@
 					(size 1.27 1.27)
 				)
 			)
+		)
+		(pin "1"
+			(uuid "eea02994-b0c1-42d6-8451-307330d2bc2d")
 		)
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "H3")
+					(reference "#PWR0108")
 					(unit 1)
 				)
 			)
@@ -11323,7 +11347,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "R_10k"
+		(property "Value" "R_100"
 			(at 52.07 96.5199 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -11548,6 +11572,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 269.24 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "47ad4a60-0be3-4f9c-a25c-95139d3505b3")
+		(property "Reference" "#PWR097"
+			(at 273.05 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 265.43 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 269.24 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 269.24 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 269.24 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "52665b71-5255-4113-ac41-56b1f8ced5ab")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR097")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
 		(at 417.83 323.85 0)
 		(unit 1)
@@ -11634,6 +11737,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 307.34 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "4839959c-c4d5-496b-af5e-bef861f05da2")
+		(property "Reference" "#PWR0130"
+			(at 311.15 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 303.53 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 307.34 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 307.34 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 307.34 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "78fb5c2c-7116-4679-8e24-4ac287ce56e6")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0130")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
 		(at 417.83 341.63 0)
 		(unit 1)
@@ -11714,6 +11896,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "Outer24")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 267.97 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "493dd5e3-62a3-4c6c-b657-b2d469b64d2d")
+		(property "Reference" "#PWR0129"
+			(at 271.78 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 264.16 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 267.97 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 267.97 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 267.97 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "af3369ec-df6d-4305-93b0-c6e6dc77d8ab")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0129")
 					(unit 1)
 				)
 			)
@@ -12037,6 +12298,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR077")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 411.48 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "4fefb793-de8e-4799-bc00-598e86e359ef")
+		(property "Reference" "#PWR0102"
+			(at 415.29 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 407.67 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 411.48 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 411.48 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 411.48 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "400a591a-66b9-4e96-9017-a3a022ce83f4")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0102")
 					(unit 1)
 				)
 			)
@@ -12370,6 +12710,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 229.87 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "550e91a6-5baa-4c96-a389-977d433a6235")
+		(property "Reference" "#PWR094"
+			(at 233.68 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 226.06 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 229.87 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 229.87 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 229.87 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a9b920bb-b4d1-4eb6-9f5c-204d59cfd8d8")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR094")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Network08")
 		(at 196.85 232.41 90)
 		(unit 1)
@@ -12381,26 +12800,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "5539dcbd-204f-423e-9ea4-1bb317063c1d")
-		(property "Reference" "RN5"
-			(at 195.8339 222.25 0)
+		(property "Reference" "RN5-100k1"
+			(at 197.104 218.44 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "100k Pullup1"
-			(at 198.3739 222.25 0)
+			(at 197.104 220.98 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -12466,7 +12883,7 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN5")
+					(reference "RN5-100k1")
 					(unit 1)
 				)
 			)
@@ -12546,6 +12963,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR075")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 308.61 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "5686f59e-0a14-44b3-8b90-a06fc7f33133")
+		(property "Reference" "#PWR099"
+			(at 312.42 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 304.8 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 308.61 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 308.61 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 308.61 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e6f7d1b2-c6a5-482c-8004-037ce3de049c")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR099")
 					(unit 1)
 				)
 			)
@@ -12949,6 +13445,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "Outer21")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 410.21 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "5bc0e71c-b068-4c29-a433-7251ee321520")
+		(property "Reference" "#PWR0134"
+			(at 414.02 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 406.4 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 410.21 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 410.21 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 410.21 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "00a0dbec-e34b-48ff-beb1-0a3d5918e988")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0134")
 					(unit 1)
 				)
 			)
@@ -13522,8 +14097,8 @@
 		)
 	)
 	(symbol
-		(lib_id "power:GND")
-		(at 196.85 309.88 0)
+		(lib_id "power:+3.3V")
+		(at 403.86 214.63 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -13532,9 +14107,9 @@
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "64e8c3cc-1059-4d15-9fdd-9d70c0074f25")
-		(property "Reference" "#PWR073"
-			(at 196.85 316.23 0)
+		(uuid "622af403-3bcb-46db-ada1-eefdef70e92d")
+		(property "Reference" "#PWR0119"
+			(at 407.67 214.63 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13544,19 +14119,19 @@
 				)
 			)
 		)
-		(property "Value" "GND"
-			(at 196.8499 313.69 90)
+		(property "Value" "+3.3V"
+			(at 400.05 214.6299 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify right)
+				(justify left)
 			)
 		)
 		(property "Footprint" ""
-			(at 196.85 309.88 0)
+			(at 403.86 214.63 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13567,7 +14142,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 196.85 309.88 0)
+			(at 403.86 214.63 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13577,8 +14152,8 @@
 				)
 			)
 		)
-		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
-			(at 196.85 309.88 0)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 403.86 214.63 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -13589,12 +14164,91 @@
 			)
 		)
 		(pin "1"
-			(uuid "a136dff3-9512-4d0d-82ce-27c812c7e296")
+			(uuid "81bf5d05-7068-4f40-863e-eb53eca1e1d1")
 		)
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "#PWR073")
+					(reference "#PWR0119")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 222.25 196.85 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "64764c4e-4749-490e-a0b1-266bbc95d413")
+		(property "Reference" "#PWR0110"
+			(at 226.06 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 218.44 196.8499 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 222.25 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 222.25 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 222.25 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "41e3680b-722d-4515-8a61-27466bf49d91")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0110")
 					(unit 1)
 				)
 			)
@@ -14267,26 +14921,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "6e7b90bb-ccfe-401a-ae15-ae2e45d3def3")
-		(property "Reference" "RN4"
-			(at 194.5639 165.1 0)
+		(property "Reference" "RN4-22"
+			(at 195.834 161.29 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "LED 1"
-			(at 197.1039 165.1 0)
+			(at 195.834 163.83 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -14352,7 +15004,86 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN4")
+					(reference "RN4-22")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 267.97 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "6f42c072-e886-4f1e-9b0e-6285c42ea5bb")
+		(property "Reference" "#PWR0128"
+			(at 271.78 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 264.16 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 267.97 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 267.97 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 267.97 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "83d85566-e45a-4ecd-abee-0b2e61fdf7e6")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0128")
 					(unit 1)
 				)
 			)
@@ -14438,19 +15169,30 @@
 		)
 	)
 	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 38.1 129.54 0)
+		(lib_id "power:+3.3V")
+		(at 300.99 196.85 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom no)
+		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "7303f40c-8b3b-40bd-b7de-791a261b55a8")
-		(property "Reference" "H2"
-			(at 40.64 128.2699 0)
+		(uuid "71effd65-0bae-4a73-9d26-bd7a568259f1")
+		(property "Reference" "#PWR0114"
+			(at 304.8 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 297.18 196.8499 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -14460,19 +15202,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "MountingHole"
-			(at 40.64 130.8099 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 38.1 129.54 0)
+		(property "Footprint" ""
+			(at 300.99 196.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14483,7 +15214,86 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 38.1 129.54 0)
+			(at 300.99 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 300.99 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "61a1c7fd-3297-46d3-82f8-24ec2bedd671")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0114")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 33.02 157.48 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7303f40c-8b3b-40bd-b7de-791a261b55a8")
+		(property "Reference" "H2"
+			(at 35.56 156.2099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 35.56 158.7499 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+			(at 33.02 157.48 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 33.02 157.48 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14494,7 +15304,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole without connection"
-			(at 38.1 129.54 0)
+			(at 33.02 157.48 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -14772,6 +15582,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 490.22 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7929b7ab-5a6f-4790-943d-d0f487303bee")
+		(property "Reference" "#PWR0106"
+			(at 494.03 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 486.41 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 490.22 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 490.22 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 490.22 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "27199238-d756-418c-a24d-6595108f221c")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0106")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Network08")
 		(at 201.93 299.72 90)
 		(unit 1)
@@ -14783,26 +15672,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "795d4700-d194-4db1-984f-05e275ee2155")
-		(property "Reference" "RN7"
-			(at 200.9139 289.56 0)
+		(property "Reference" "RN7-22"
+			(at 202.184 285.75 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
-		(property "Value" "LED 1"
-			(at 203.4539 289.56 0)
+		(property "Value" "LED 3"
+			(at 202.184 288.29 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -14868,7 +15755,165 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN7")
+					(reference "RN7-22")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 449.58 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7a64aa5f-4570-4caf-91be-9656b0eb0f80")
+		(property "Reference" "#PWR0137"
+			(at 453.39 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 445.77 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 449.58 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 449.58 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 449.58 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9fbc5b10-0f0f-4fc5-9e22-7112341e8a96")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0137")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 308.61 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "7c9af91f-660d-4ac7-8d2a-37eb623e01f0")
+		(property "Reference" "#PWR098"
+			(at 312.42 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 304.8 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 308.61 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 308.61 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 308.61 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "0d078b33-450f-4cda-8846-668906506aad")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR098")
 					(unit 1)
 				)
 			)
@@ -15126,6 +16171,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 222.25 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "80d04c01-c48d-498f-b984-e9a524116ced")
+		(property "Reference" "#PWR0111"
+			(at 226.06 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 218.44 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 222.25 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 222.25 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 222.25 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fefb935e-5d1f-410e-b14c-881a8f33e994")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0111")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R_Network08")
 		(at 203.2 36.83 90)
 		(unit 1)
@@ -15137,26 +16261,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "84660c02-f19b-4923-96ca-171f1cdccee2")
-		(property "Reference" "RN2"
-			(at 202.1839 26.67 0)
+		(property "Reference" "RN2-22"
+			(at 203.454 22.86 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "LED 1"
-			(at 204.7239 26.67 0)
+			(at 203.454 25.4 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -15222,7 +16344,7 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN2")
+					(reference "RN2-22")
 					(unit 1)
 				)
 			)
@@ -15485,6 +16607,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "U5")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 261.62 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "85c084f2-3361-4bd6-bfdd-115a96eac905")
+		(property "Reference" "#PWR0113"
+			(at 265.43 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 257.81 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 261.62 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 261.62 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 261.62 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "9180fcb9-52b3-472f-9ba6-26dcd2349051")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0113")
 					(unit 1)
 				)
 			)
@@ -15971,6 +17172,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 521.97 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "8edde53b-1df0-4a00-aeea-d9f835711321")
+		(property "Reference" "#PWR0125"
+			(at 525.78 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 518.16 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 521.97 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 521.97 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 521.97 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c82baf77-c7f3-4153-9a19-f296de19dd74")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0125")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
 		(at 276.86 60.96 0)
 		(unit 1)
@@ -16302,6 +17582,85 @@
 	)
 	(symbol
 		(lib_id "power:+3.3V")
+		(at 228.6 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "93dab5cd-bec8-4570-b652-966a971948e2")
+		(property "Reference" "#PWR0126"
+			(at 232.41 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 224.79 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 228.6 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 228.6 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 228.6 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "ef7451f5-94d6-42b5-8ea0-f9bd4c9ef948")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0126")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
 		(at 102.87 151.13 0)
 		(unit 1)
 		(body_style 1)
@@ -16373,6 +17732,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR030")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 228.6 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "9471495f-cba7-4340-a464-a8f3985a5fa4")
+		(property "Reference" "#PWR0127"
+			(at 232.41 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 224.79 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 228.6 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 228.6 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 228.6 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "bf55a272-d268-479e-8b99-eb375d7cc9d5")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0127")
 					(unit 1)
 				)
 			)
@@ -16940,6 +18378,85 @@
 	)
 	(symbol
 		(lib_id "power:+3.3V")
+		(at 443.23 196.85 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "9b873b9c-455d-4ef9-a4c4-783dcd831a26")
+		(property "Reference" "#PWR0120"
+			(at 447.04 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 439.42 196.8499 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 443.23 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 443.23 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 443.23 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "6ddba1ec-fb80-4b06-9e00-622363f4c9d9")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0120")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
 		(at 80.01 193.04 270)
 		(unit 1)
 		(body_style 1)
@@ -17012,6 +18529,164 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR01")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 488.95 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "9dcf2b20-44bc-44ce-9683-170ad38c4ceb")
+		(property "Reference" "#PWR0138"
+			(at 492.76 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 485.14 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 488.95 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 488.95 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 488.95 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "83a99a59-e191-4456-84df-88fc1b7fd380")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0138")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 261.62 196.85 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "9e9f975e-927e-4eef-b9b4-105e8caa1d67")
+		(property "Reference" "#PWR0112"
+			(at 265.43 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 257.81 196.8499 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 261.62 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 261.62 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 261.62 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4c153e2c-99ed-4f0d-bb53-5024a8471610")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0112")
 					(unit 1)
 				)
 			)
@@ -17181,7 +18856,7 @@
 	)
 	(symbol
 		(lib_id "Mechanical:MountingHole")
-		(at 38.1 143.51 0)
+		(at 33.02 171.45 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -17192,7 +18867,7 @@
 		(fields_autoplaced yes)
 		(uuid "a2bc752c-dbac-4de7-a155-4543434e647b")
 		(property "Reference" "H4"
-			(at 40.64 142.2399 0)
+			(at 35.56 170.1799 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17203,7 +18878,7 @@
 			)
 		)
 		(property "Value" "MountingHole"
-			(at 40.64 144.7799 0)
+			(at 35.56 172.7199 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17214,7 +18889,7 @@
 			)
 		)
 		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 38.1 143.51 0)
+			(at 33.02 171.45 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17225,7 +18900,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 38.1 143.51 0)
+			(at 33.02 171.45 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17236,7 +18911,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole without connection"
-			(at 38.1 143.51 0)
+			(at 33.02 171.45 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17257,7 +18932,7 @@
 	)
 	(symbol
 		(lib_id "Mechanical:MountingHole")
-		(at 38.1 121.92 0)
+		(at 33.02 149.86 0)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
@@ -17268,7 +18943,7 @@
 		(fields_autoplaced yes)
 		(uuid "a39eb0ca-e5f3-4a48-aed0-142ba8a758b0")
 		(property "Reference" "H1"
-			(at 40.64 120.6499 0)
+			(at 35.56 148.5899 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17279,7 +18954,7 @@
 			)
 		)
 		(property "Value" "MountingHole"
-			(at 40.64 123.1899 0)
+			(at 35.56 151.1299 0)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -17290,7 +18965,7 @@
 			)
 		)
 		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 38.1 121.92 0)
+			(at 33.02 149.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17301,7 +18976,7 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 38.1 121.92 0)
+			(at 33.02 149.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17312,7 +18987,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole without connection"
-			(at 38.1 121.92 0)
+			(at 33.02 149.86 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -17326,6 +19001,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "H1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 521.97 196.85 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a4140612-e6a5-4392-8f35-b33252a58795")
+		(property "Reference" "#PWR0124"
+			(at 525.78 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 518.16 196.8499 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 521.97 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 521.97 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 521.97 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1f633d2c-893c-45ec-a5f1-d03079bd3641")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0124")
 					(unit 1)
 				)
 			)
@@ -17411,6 +19165,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 411.48 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a477a5bb-cbc2-4289-8e1e-c4ecea8c207b")
+		(property "Reference" "#PWR0103"
+			(at 415.29 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 407.67 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 411.48 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 411.48 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 411.48 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "6e27cb3b-c55d-41af-9545-01c91a6c31a5")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0103")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 505.46 81.28 90)
 		(unit 1)
@@ -17484,6 +19317,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR051")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 490.22 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a4fdab41-cb79-4603-b8a0-d7cf7243e0ac")
+		(property "Reference" "#PWR0107"
+			(at 494.03 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 486.41 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 490.22 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 490.22 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 490.22 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "b0e9bad3-1dd8-4d21-ac4a-ed1827730d39")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0107")
 					(unit 1)
 				)
 			)
@@ -17656,6 +19568,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "Outer26")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 528.32 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "a8c0c42d-6bd6-4cb9-b567-a38bdec56a82")
+		(property "Reference" "#PWR0141"
+			(at 532.13 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 524.51 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 528.32 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 528.32 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 528.32 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "e4295819-53cc-407d-9302-6cea41c41192")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0141")
 					(unit 1)
 				)
 			)
@@ -17909,6 +19900,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 488.95 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b1ebae12-8f04-431b-8f1c-d45802d8ff0f")
+		(property "Reference" "#PWR0139"
+			(at 492.76 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 485.14 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 488.95 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 488.95 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 488.95 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "1f3a9bdc-45bd-4955-8b5c-7b2869dc9311")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0139")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Device:R")
 		(at 102.87 154.94 180)
 		(unit 1)
@@ -18013,7 +20083,7 @@
 				(justify left)
 			)
 		)
-		(property "Value" "R_10k"
+		(property "Value" "R_100"
 			(at 50.8 71.1199 0)
 			(show_name no)
 			(do_not_autoplace no)
@@ -18084,26 +20154,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b505d95a-58ba-481d-a71c-20fd6249bcda")
-		(property "Reference" "RN6"
-			(at 382.5239 222.25 0)
+		(property "Reference" "RN6-100k1"
+			(at 383.794 218.44 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "100k Pullup1"
-			(at 385.0639 222.25 0)
+			(at 383.794 220.98 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -18169,7 +20237,7 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN6")
+					(reference "RN6-100k1")
 					(unit 1)
 				)
 			)
@@ -18187,26 +20255,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "b75f7efa-43ed-41a1-bd8f-d290b898c7fd")
-		(property "Reference" "RN8"
-			(at 202.1839 346.71 0)
+		(property "Reference" "RN8-100k1"
+			(at 203.454 342.9 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "100k Pullup1"
-			(at 204.7239 346.71 0)
+			(at 203.454 345.44 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -18272,7 +20338,86 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN8")
+					(reference "RN8-100k1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 307.34 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b80d3190-41b8-4401-a560-8240c4c4ea96")
+		(property "Reference" "#PWR0131"
+			(at 311.15 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 303.53 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 307.34 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 307.34 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 307.34 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "63850ec1-b470-418a-a768-d1d3ab3e30b7")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0131")
 					(unit 1)
 				)
 			)
@@ -18438,6 +20583,164 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR070")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 449.58 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b9898cc2-4d5a-4547-8fd3-103c3254344b")
+		(property "Reference" "#PWR0136"
+			(at 453.39 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 445.77 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 449.58 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 449.58 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 449.58 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c9fcffab-e5e5-4fe3-acc7-4eb6216ab97f")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0136")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 528.32 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "b992adf0-383e-4057-a20d-077f1f9cf0b6")
+		(property "Reference" "#PWR0140"
+			(at 532.13 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 524.51 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 528.32 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 528.32 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 528.32 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "c12d7e28-f5d7-4e55-bd50-38e8b205ee75")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0140")
 					(unit 1)
 				)
 			)
@@ -18769,6 +21072,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "C1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 229.87 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "bdab0c5f-249a-4e89-8177-fb8bb2c6e84e")
+		(property "Reference" "#PWR093"
+			(at 233.68 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 226.06 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 229.87 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 229.87 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 229.87 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "856ee5f7-3bac-42e7-84ea-ea033eb5eacc")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR093")
 					(unit 1)
 				)
 			)
@@ -19254,6 +21636,88 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 49.53 123.19 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c0d29434-0b27-4aa8-99d0-05f3c520ca76")
+		(property "Reference" "R8"
+			(at 52.07 121.9199 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "R_100"
+			(at 52.07 124.4599 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Resistor_THT:R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal"
+			(at 47.752 123.19 90)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 49.53 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 49.53 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a6519cea-50e9-40fc-9bac-ea137b4530cf")
+		)
+		(pin "2"
+			(uuid "f9f4df08-de0a-4ac1-8564-1fd71691f1af")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "R8")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 363.22 63.5 90)
 		(unit 1)
@@ -19327,6 +21791,84 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR044")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 62.23 124.46 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "c481c70e-bc71-4830-9e1b-e72347e78599")
+		(property "Reference" "#PWR095"
+			(at 62.23 130.81 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 62.23 129.54 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 62.23 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 62.23 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 62.23 124.46 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "eb9a52b6-2da0-4a14-8fa5-88e728dae49f")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR095")
 					(unit 1)
 				)
 			)
@@ -19743,6 +22285,173 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 346.71 321.31 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "cd808db3-64f1-49ab-800a-6db64f6abc05")
+		(property "Reference" "#PWR0132"
+			(at 350.52 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 342.9 321.3099 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 346.71 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 346.71 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 346.71 321.31 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "a532d837-e3c8-4bea-8f31-d1cc203ab055")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0132")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Transistor_FET:IRLB8721PBF")
+		(at 59.69 119.38 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ce7ccc86-a717-44e3-bdbf-ac15b464dc6a")
+		(property "Reference" "Q3"
+			(at 66.04 118.1099 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "IRLB8721PBF"
+			(at 66.04 120.6499 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "Package_TO_SOT_THT:TO-220-3_Vertical"
+			(at 64.77 121.285 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(justify left)
+			)
+		)
+		(property "Datasheet" "http://www.infineon.com/dgdl/irlb8721pbf.pdf?fileId=5546d462533600a40153566056732591"
+			(at 64.77 123.19 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Description" "62A Id, 30V Vds, 8.7 mOhm Rds, N-Channel HEXFET Power MOSFET, TO-220"
+			(at 59.69 119.38 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "2"
+			(uuid "8a28feac-3ace-4729-8fef-d7890060a0f8")
+		)
+		(pin "3"
+			(uuid "3f9defc1-2bc1-47e4-bc83-b53ee8135049")
+		)
+		(pin "1"
+			(uuid "a6c919e2-d84b-4758-a661-8fc3e213566b")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "Q3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
 		(at 308.61 217.17 0)
 		(unit 1)
@@ -20151,6 +22860,164 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 529.59 76.2 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d6fa9670-1d45-4750-80b7-58f718f4b674")
+		(property "Reference" "#PWR0109"
+			(at 533.4 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 525.78 76.1999 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 529.59 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 529.59 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 529.59 76.2 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "4264f737-414a-44f8-af00-b68008099960")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0109")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 450.85 58.42 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d77bbc67-a169-4ca7-a162-6f925f8dd4a1")
+		(property "Reference" "#PWR0104"
+			(at 454.66 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 447.04 58.4199 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 450.85 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 450.85 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 450.85 58.42 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "6815d38e-42fe-41d3-8e06-94e885758745")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0104")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 504.19 344.17 90)
 		(unit 1)
@@ -20224,6 +23091,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR089")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 340.36 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "d925de34-1376-4dc5-ae0e-df960dec5ef6")
+		(property "Reference" "#PWR0117"
+			(at 344.17 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 336.55 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 340.36 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 340.36 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 340.36 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "37baf206-964b-48f1-9592-6fd7e99de9f9")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0117")
 					(unit 1)
 				)
 			)
@@ -20972,26 +23918,24 @@
 		(dnp no)
 		(fields_autoplaced yes)
 		(uuid "e6de4320-553e-4092-8246-8396457be29a")
-		(property "Reference" "RN9"
-			(at 388.8739 346.71 0)
+		(property "Reference" "RN9-100k1"
+			(at 390.144 342.9 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Value" "100k Pullup1"
-			(at 391.4139 346.71 0)
+			(at 390.144 345.44 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
-				(justify left)
 			)
 		)
 		(property "Footprint" "Resistor_THT:R_Array_SIP9"
@@ -21057,7 +24001,7 @@
 		(instances
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
-					(reference "RN9")
+					(reference "RN9-100k1")
 					(unit 1)
 				)
 			)
@@ -21137,6 +24081,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "#PWR027")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 482.6 196.85 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e72410da-68fd-415b-975a-3369369773dd")
+		(property "Reference" "#PWR0122"
+			(at 486.41 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 478.79 196.8499 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 482.6 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 482.6 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 482.6 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "77059c2c-c6c4-4ae5-835a-7760dbc6694e")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0122")
 					(unit 1)
 				)
 			)
@@ -21302,6 +24325,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "Inner25")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 482.6 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "ecc238e5-d83b-43ce-86ed-95b90dcd180b")
+		(property "Reference" "#PWR0123"
+			(at 486.41 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 478.79 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 482.6 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 482.6 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 482.6 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "2036c766-8f5a-4078-b289-f719a5801f71")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0123")
 					(unit 1)
 				)
 			)
@@ -21868,6 +24970,85 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 403.86 196.85 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f297f20c-940e-442e-a6eb-ee95924f7fe1")
+		(property "Reference" "#PWR0118"
+			(at 407.67 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 400.05 196.8499 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 403.86 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 403.86 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 403.86 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "08cd2743-26fb-4e96-8f8e-54fce9a95478")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0118")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "power:GND")
 		(at 323.85 63.5 90)
 		(unit 1)
@@ -22270,6 +25451,164 @@
 		)
 	)
 	(symbol
+		(lib_id "power:+3.3V")
+		(at 410.21 339.09 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f6a08388-2ac4-4fe3-b1a5-9984f9dfdde6")
+		(property "Reference" "#PWR0135"
+			(at 414.02 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 406.4 339.0899 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 410.21 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 410.21 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 410.21 339.09 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "fc15528f-bfb0-4d46-b9cc-df853b9f667b")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0135")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:+3.3V")
+		(at 300.99 214.63 90)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f85f1738-ccb3-455e-aa71-bdb2fa79d6d7")
+		(property "Reference" "#PWR0115"
+			(at 304.8 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 297.18 214.6299 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" ""
+			(at 300.99 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 300.99 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 300.99 214.63 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "7f4dcfc9-fa13-431d-88fc-bf97ed43777c")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0115")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Sensor_Proximity:QRE1113")
 		(at 535.94 341.63 0)
 		(unit 1)
@@ -22442,19 +25781,30 @@
 		)
 	)
 	(symbol
-		(lib_id "Mechanical:MountingHole")
-		(at 38.1 149.86 0)
+		(lib_id "power:+3.3V")
+		(at 340.36 196.85 90)
 		(unit 1)
 		(body_style 1)
 		(exclude_from_sim no)
-		(in_bom no)
+		(in_bom yes)
 		(on_board yes)
 		(in_pos_files yes)
 		(dnp no)
 		(fields_autoplaced yes)
-		(uuid "f9448513-0023-4313-9ff0-63f9ee39d27d")
-		(property "Reference" "H5"
-			(at 40.64 148.5899 0)
+		(uuid "f892ab4b-58b8-424a-8b5c-2870f71b39a7")
+		(property "Reference" "#PWR0116"
+			(at 344.17 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "+3.3V"
+			(at 336.55 196.8499 90)
 			(show_name no)
 			(do_not_autoplace no)
 			(effects
@@ -22464,19 +25814,8 @@
 				(justify left)
 			)
 		)
-		(property "Value" "MountingHole"
-			(at 40.64 151.1299 0)
-			(show_name no)
-			(do_not_autoplace no)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
-			(at 38.1 149.86 0)
+		(property "Footprint" ""
+			(at 340.36 196.85 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22487,7 +25826,86 @@
 			)
 		)
 		(property "Datasheet" ""
-			(at 38.1 149.86 0)
+			(at 340.36 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"+3.3V\""
+			(at 340.36 196.85 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "eae6a9bb-219b-4a52-bb4c-fae7db9a8df4")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR0116")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Mechanical:MountingHole")
+		(at 33.02 177.8 0)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom no)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f9448513-0023-4313-9ff0-63f9ee39d27d")
+		(property "Reference" "H5"
+			(at 35.56 176.5299 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Value" "MountingHole"
+			(at 35.56 179.0699 0)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+			)
+		)
+		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+			(at 33.02 177.8 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 33.02 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22498,7 +25916,7 @@
 			)
 		)
 		(property "Description" "Mounting Hole without connection"
-			(at 38.1 149.86 0)
+			(at 33.02 177.8 0)
 			(hide yes)
 			(show_name no)
 			(do_not_autoplace no)
@@ -22512,6 +25930,85 @@
 			(project "easy-bee-counter-2026"
 				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
 					(reference "H5")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 50.8 111.76 270)
+		(unit 1)
+		(body_style 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(in_pos_files yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "fb28eca1-098e-44d2-ab44-d10da0cf0f94")
+		(property "Reference" "#PWR092"
+			(at 44.45 111.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "GND"
+			(at 46.99 111.7599 90)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 50.8 111.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Datasheet" ""
+			(at 50.8 111.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 50.8 111.76 0)
+			(hide yes)
+			(show_name no)
+			(do_not_autoplace no)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(pin "1"
+			(uuid "5817cfc5-73ea-4449-9848-882a048a06ff")
+		)
+		(instances
+			(project "easy-bee-counter-2026"
+				(path "/84e96d39-b501-4ae7-b37a-cc3ea4539e19"
+					(reference "#PWR092")
 					(unit 1)
 				)
 			)
