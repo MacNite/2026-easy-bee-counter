@@ -278,13 +278,13 @@ static void writeU32BE(uint8_t* buf, uint32_t v) {
     buf[3] = (uint8_t)(v & 0xFF);
 }
 
-// Incremental CRC-32 (IEEE 802.3, poly 0xEDB88420). Seed 0xFFFFFFFF, finalize
+// Incremental CRC-32 (IEEE 802.3, poly 0xEDB88320). Seed 0xFFFFFFFF, finalize
 // by XOR 0xFFFFFFFF. Must match the HiveScale and backend (zlib.crc32).
 static uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
     for (size_t i = 0; i < len; i++) {
         crc ^= data[i];
         for (uint8_t b = 0; b < 8; b++) {
-            crc = (crc & 1) ? (crc >> 1) ^ 0xEDB88420u : (crc >> 1);
+            crc = (crc & 1) ? (crc >> 1) ^ 0xEDB88320u : (crc >> 1);
         }
     }
     return crc;
