@@ -1,0 +1,12 @@
+# 4MB ESP32-C6 partition table for the Easy Bee Counter BLE build: dual OTA app
+# slots, no big FS. Used only by the -DBEECOUNTER_BLE environment so a central
+# can push firmware over BLE (firmware-over-BLE OTA in src/ble_link.cpp). Each
+# app slot is 0x1F0000 = 2,031,616 bytes — ample for the NimBLE + JSON image.
+# Mirrors HiveInside/firmware/partitions_4mb_ota_no_fs.csv so the devices share
+# the same OTA layout.
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xe000,   0x2000,
+app0,     app,  ota_0,   0x10000,  0x1F0000,
+app1,     app,  ota_1,   0x200000, 0x1F0000,
+spiffs,   data, spiffs,  0x3F0000, 0x10000,
