@@ -10,9 +10,14 @@ BLE/GATT totals-only sensor and no longer supports the wired counter link. See
 [`docs/ble-mode.md`](../docs/ble-mode.md).
 
 The wireless image also exposes HiveInside-style connectable BLE OTA
-characteristics. Image size and CRC-32 are verified before the inactive app
-slot is selected; see the BLE-mode documentation for framing and the remaining
-HiveHub relay work.
+characteristics, which HiveHub drives with its `update_beecounter` command.
+Image size and CRC-32 are verified before the inactive app slot is selected; see
+the BLE-mode documentation for the framing.
+
+The image version lives in [`include/version.h`](include/version.h) and is
+reported over BLE as the measurement JSON's `ver` field. **Bump it for every
+released image** — HiveHub gates an OTA relay on it being newer than what the
+counter reports, and uses it afterwards to confirm the update took.
 
 > **2026 dual-I2C revision:** this firmware uses **both** of the ESP32-C6's
 > independent I2C controllers — one permanently MASTER for the on-board
