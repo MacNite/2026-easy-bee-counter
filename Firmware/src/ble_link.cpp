@@ -1,327 +1,262 @@
-// ============================================================================
-// ble_link.cpp — connectable NimBLE GATT server for the Easy Bee Counter 2026
-// ----------------------------------------------------------------------------
-// Compiled only in the BLE build (-DBEECOUNTER_BLE). A direct sibling of
-// HiveInside/firmware/src/ble_link.cpp: same NimBLE 2.x stack, same compact-JSON
-// measurement characteristic, and the same firmware-over-BLE OTA scheme (framed
-// BEGIN/END/ABORT control + streamed payload + readable/notifiable status, with
-// an end-to-end CRC-32 verified before anything is committed).
-//
-// Unlike HiveInside this device never sleeps (its power is dominated by the IR
-// emitters), so there is no wake-sync / deep-sleep machinery here — it just
-// stays advertising-connectable while main.cpp keeps counting.
-//
-// The counter state lives in main.cpp; we reach it only through the
-// ble::getTelemetry() / ble::applyCtrl() callbacks declared in ble_link.h.
-// ============================================================================
+// HiveHub-compatible BLE/GATT transport for HiveTraffic.
 #include "ble_link.h"
 
 #ifdef BEECOUNTER_BLE
 
 #include <Arduino.h>
 #include <NimBLEDevice.h>
-#include <ArduinoJson.h>
-#include <Update.h>          // ESP32 OTA writer (esp_ota under the hood)
+#include <Update.h>
+#include <stdio.h>
 
-#include "i2c_slave_protocol.h"   // shared CMD_* and OTA_STATE_* opcodes
+#include "i2c_slave_protocol.h"
 
 namespace ble {
+namespace {
 
-// ── Advertised name ─────────────────────────────────────────────────────────
-static const char* BLE_DEVICE_NAME = "BeeCounter";
+constexpr char BLE_DEVICE_NAME[] = "BeeCounter";
+constexpr char SVC_BEECOUNTER[] = "8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01";
+constexpr char CHR_MEASUREMENT[] = "8e8b0102-7a1c-4b9e-9a2f-1d6e0b9c1a01";
+constexpr char CHR_OTA_CTRL[] = "8e8b0110-7a1c-4b9e-9a2f-1d6e0b9c1a01";
+constexpr char CHR_OTA_DATA[] = "8e8b0111-7a1c-4b9e-9a2f-1d6e0b9c1a01";
+constexpr char CHR_OTA_STATUS[] = "8e8b0113-7a1c-4b9e-9a2f-1d6e0b9c1a01";
+constexpr uint16_t ADV_INTERVAL_UNITS = 1600;  // 1600 * 0.625 ms = 1 second
+constexpr uint8_t OTA_OP_BEGIN = 0x01;
+constexpr uint8_t OTA_OP_END = 0x03;
+constexpr uint8_t OTA_OP_ABORT = 0x04;
+constexpr uint32_t OTA_REBOOT_DELAY_MS = 1500;
 
-// ── Custom GATT service + characteristic UUIDs ──────────────────────────────
-// A distinct 128-bit base from HiveInside's so a HiveScale central can tell the
-// two devices apart. (HiveInside uses 8e8b00xx-…; we use 8e8b01xx-… .)
-static const char* SVC_BEECOUNTER   = "8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01";
-static const char* CHR_MEASUREMENT  = "8e8b0102-7a1c-4b9e-9a2f-1d6e0b9c1a01"; // read/notify JSON
-static const char* CHR_CTRL         = "8e8b0103-7a1c-4b9e-9a2f-1d6e0b9c1a01"; // write 1 CMD byte
-
-// Firmware-over-BLE characteristics (same custom service). Mirrors the
-// HiveInside OTA UUIDs/semantics so a future HiveScale relay can reuse its code.
-static const char* CHR_OTA_CTRL     = "8e8b0110-7a1c-4b9e-9a2f-1d6e0b9c1a01"; // write: framed control
-static const char* CHR_OTA_DATA     = "8e8b0111-7a1c-4b9e-9a2f-1d6e0b9c1a01"; // write: payload stream
-static const char* CHR_OTA_STATUS   = "8e8b0113-7a1c-4b9e-9a2f-1d6e0b9c1a01"; // read/notify: state+recv+err
-
-// ===========================================================================
-// Measurement characteristic
-// ===========================================================================
-static NimBLECharacteristic* chrMeasurement = nullptr;
-
-// Serialise the aggregate telemetry to JSON. Only the figures the backend
-// uploads (totals + latched interval) plus diagnostics — no per-gate arrays —
-// so this lands well under the 512-byte ATT cap with room to spare.
-static String measurementJson(const Telemetry& t) {
-    JsonDocument doc;
-    doc["fw"]            = t.protocol_version;   // protocol/firmware revision
-    doc["uptime_s"]      = t.uptime_s;
-    doc["status"]        = t.status_flags;
-    doc["num_gates"]     = t.num_gates;
-    doc["gates_healthy"] = t.gates_healthy;
-    doc["total_in"]      = t.total_in;
-    doc["total_out"]     = t.total_out;
-    doc["interval_in"]   = t.interval_in;
-    doc["interval_out"]  = t.interval_out;
-    doc["glitches"]      = t.glitch_count;
-    String out;
-    serializeJson(doc, out);
-    return out;
-}
-
-// ===========================================================================
-// Control characteristic — a single REG_CTRL-style command byte
-// ===========================================================================
-class CtrlCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
-        NimBLEAttValue v = c->getValue();
-        if (v.size() < 1) return;
-        uint8_t cmd = v.data()[0];
-        Serial.printf("[BLE] CTRL cmd 0x%02X\n", cmd);
-        applyCtrl(cmd);
-        // Reflect the post-command state immediately (e.g. cleared interval
-        // after CMD_LATCH) so a subscriber sees the fresh values.
-        publish();
-    }
-};
-
-// ===========================================================================
-// Server callbacks — keep advertising after a disconnect
-// ===========================================================================
-class ServerCallbacks : public NimBLEServerCallbacks {
-    void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override {
-        Serial.println("[BLE] central connected");
-    }
-    void onDisconnect(NimBLEServer* s, NimBLEConnInfo& info, int reason) override {
-        Serial.printf("[BLE] central disconnected (reason %d); re-advertising\n", reason);
-        NimBLEDevice::startAdvertising();
-    }
-};
-
-// ===========================================================================
-// Firmware-over-BLE (OTA target)
-// ===========================================================================
-// HiveScale streams a new image into CHR_OTA_DATA in order; we write each chunk
-// straight to the inactive OTA slot via the Arduino Update API and keep a
-// running CRC-32. CHR_OTA_CTRL frames BEGIN / END / ABORT; CHR_OTA_STATUS lets
-// the central poll progress and the final result. Nothing is committed until
-// END verifies the end-to-end CRC, so a dropped/corrupted transfer always
-// leaves the device on its current image. Byte-for-byte the HiveInside scheme.
-
-// Control opcodes (first byte of a CTRL write) — match HiveInside.
-static constexpr uint8_t OTA_OP_BEGIN = 0x01;  // + size(4 LE) + crc32(4 LE)
-static constexpr uint8_t OTA_OP_END   = 0x03;  // finalize, verify, reboot
-static constexpr uint8_t OTA_OP_ABORT = 0x04;  // cancel
-
-// We report progress using the shared beecounter_proto::OTA_STATE_* values so a
-// HiveScale relay can interpret the BLE and I2C OTA paths identically.
 using namespace beecounter_proto;
 
-static NimBLECharacteristic* chrOtaStatus = nullptr;
-static volatile uint8_t  s_otaState = OTA_STATE_IDLE;
-static volatile uint8_t  s_otaErr   = OTA_ERR_NONE;
-static uint32_t s_otaSize        = 0;             // expected image size
-static volatile uint32_t s_otaRecv = 0;           // bytes written so far
-static uint32_t s_otaExpectedCrc = 0;             // end-to-end CRC from BEGIN
-static uint32_t s_otaRunningCrc  = 0xFFFFFFFFUL;
-static unsigned long s_otaRebootAt = 0;           // 0 = no reboot pending
+NimBLECharacteristic* otaStatus = nullptr;
+volatile uint8_t otaState = OTA_STATE_IDLE;
+volatile uint8_t otaError = OTA_ERR_NONE;
+volatile uint32_t otaReceived = 0;
+uint32_t otaSize = 0;
+uint32_t otaExpectedCrc = 0;
+uint32_t otaRunningCrc = 0xFFFFFFFFUL;
+uint32_t otaRebootAt = 0;
 
-// CRC-32 (IEEE 802.3, reflected poly 0xEDB88320) — same as zlib.crc32 on the
-// backend and the I2C OTA path in main.cpp, so a value verified here matches
-// end to end. Used with init/final 0xFFFFFFFF.
-static uint32_t crc32_update(uint32_t crc, const uint8_t* p, size_t n) {
-    for (size_t i = 0; i < n; i++) {
-        crc ^= p[i];
-        for (int k = 0; k < 8; k++) {
-            uint32_t mask = (uint32_t)(-(int32_t)(crc & 1u));
+static uint32_t crc32Update(uint32_t crc, const uint8_t* data, size_t length) {
+    while (length--) {
+        crc ^= *data++;
+        for (uint8_t bit = 0; bit < 8; ++bit) {
+            const uint32_t mask = static_cast<uint32_t>(
+                -static_cast<int32_t>(crc & 1U));
             crc = (crc >> 1) ^ (0xEDB88320UL & mask);
         }
     }
     return crc;
 }
 
-static void otaPublishStatus() {
-    if (!chrOtaStatus) return;
-    // state(1) + received(4 BE) + err(1) — same layout as REG_OTA_STATUS.
-    uint8_t b[6];
-    b[0] = s_otaState;
-    uint32_t r = s_otaRecv;
-    b[1] = (r >> 24) & 0xFF; b[2] = (r >> 16) & 0xFF;
-    b[3] = (r >> 8) & 0xFF;  b[4] = r & 0xFF;
-    b[5] = s_otaErr;
-    chrOtaStatus->setValue(b, sizeof(b));
-    chrOtaStatus->notify();
+static void publishOtaStatus() {
+    if (!otaStatus) return;
+    const uint32_t received = otaReceived;
+    // Same six-byte, little-endian status used by HiveInside.
+    uint8_t value[6] = {
+        otaState,
+        static_cast<uint8_t>(received),
+        static_cast<uint8_t>(received >> 8),
+        static_cast<uint8_t>(received >> 16),
+        static_cast<uint8_t>(received >> 24),
+        otaError,
+    };
+    otaStatus->setValue(value, sizeof(value));
+    otaStatus->notify();
 }
 
-static void otaFail(uint8_t state) {
-    if (s_otaState == OTA_STATE_RECEIVING) Update.abort();
-    s_otaState = state;
-    s_otaErr   = state;
-    otaPublishStatus();
+static void failOta(uint8_t state) {
+    if (otaState == OTA_STATE_RECEIVING) Update.abort();
+    otaRebootAt = 0;
+    otaState = state;
+    otaError = state;
+    publishOtaStatus();
 }
 
-class OtaCtrlCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
-        NimBLEAttValue v = c->getValue();
-        if (v.size() < 1) return;
-        const uint8_t* p = v.data();
-        switch (p[0]) {
+static void refreshMeasurement(NimBLECharacteristic* characteristic) {
+    Telemetry t{};
+    getTelemetry(t);
+    char json[192];
+    const int length = snprintf(
+        json, sizeof(json),
+        "{\"fw\":%u,\"uptime_s\":%u,\"status\":%u,\"num_gates\":%u,"
+        "\"gates_healthy\":%u,\"total_in\":%lu,\"total_out\":%lu,"
+        "\"glitches\":%u}",
+        t.protocol_version, t.uptime_s, t.status_flags, t.num_gates,
+        t.gates_healthy, static_cast<unsigned long>(t.total_in),
+        static_cast<unsigned long>(t.total_out), t.glitch_count);
+    if (length <= 0 || static_cast<size_t>(length) >= sizeof(json)) {
+        Serial.println(F("[BLE] measurement serialization failed"));
+        return;
+    }
+    characteristic->setValue(reinterpret_cast<const uint8_t*>(json), length);
+}
+
+class MeasurementCallbacks : public NimBLECharacteristicCallbacks {
+    void onRead(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+        // Build the snapshot on demand: no periodic JSON allocation or stale read.
+        refreshMeasurement(characteristic);
+    }
+};
+
+class OtaControlCallbacks : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+        const NimBLEAttValue value = characteristic->getValue();
+        if (value.size() == 0) return;
+        const uint8_t* data = value.data();
+
+        switch (data[0]) {
         case OTA_OP_BEGIN: {
-            if (v.size() < 9) { otaFail(OTA_STATE_ERR_BEGIN); return; }
-            uint32_t size = (uint32_t)p[1] | ((uint32_t)p[2] << 8) |
-                            ((uint32_t)p[3] << 16) | ((uint32_t)p[4] << 24);
-            uint32_t crc  = (uint32_t)p[5] | ((uint32_t)p[6] << 8) |
-                            ((uint32_t)p[7] << 16) | ((uint32_t)p[8] << 24);
-            if (!Update.begin(size)) {
-                Serial.printf("[OTA] Update.begin(%u) failed: %s\n",
-                              (unsigned)size, Update.errorString());
-                otaFail(OTA_STATE_ERR_BEGIN);
+            if (value.size() != 9) {
+                failOta(OTA_STATE_ERR_BEGIN);
                 return;
             }
-            s_otaSize        = size;
-            s_otaExpectedCrc = crc;
-            s_otaRecv        = 0;
-            s_otaRunningCrc  = 0xFFFFFFFFUL;
-            s_otaErr         = OTA_ERR_NONE;
-            s_otaState       = OTA_STATE_RECEIVING;
-            Serial.printf("[OTA] BEGIN size=%u crc=0x%08X\n", (unsigned)size, (unsigned)crc);
-            otaPublishStatus();
+            if (otaState == OTA_STATE_RECEIVING) Update.abort();
+            otaSize = static_cast<uint32_t>(data[1]) |
+                      (static_cast<uint32_t>(data[2]) << 8) |
+                      (static_cast<uint32_t>(data[3]) << 16) |
+                      (static_cast<uint32_t>(data[4]) << 24);
+            otaExpectedCrc = static_cast<uint32_t>(data[5]) |
+                             (static_cast<uint32_t>(data[6]) << 8) |
+                             (static_cast<uint32_t>(data[7]) << 16) |
+                             (static_cast<uint32_t>(data[8]) << 24);
+            otaReceived = 0;
+            otaRunningCrc = 0xFFFFFFFFUL;
+            otaRebootAt = 0;
+            if (otaSize == 0 || !Update.begin(otaSize)) {
+                Serial.printf("[BLE-OTA] BEGIN rejected: size=%lu error=%s\n",
+                              static_cast<unsigned long>(otaSize),
+                              Update.errorString());
+                failOta(OTA_STATE_ERR_BEGIN);
+                return;
+            }
+            otaError = OTA_ERR_NONE;
+            otaState = OTA_STATE_RECEIVING;
+            publishOtaStatus();
+            Serial.printf("[BLE-OTA] receiving %lu bytes, crc=0x%08lX\n",
+                          static_cast<unsigned long>(otaSize),
+                          static_cast<unsigned long>(otaExpectedCrc));
             break;
         }
         case OTA_OP_END: {
-            if (s_otaState != OTA_STATE_RECEIVING) return;
-            if (s_otaRecv != s_otaSize) {
-                Serial.printf("[OTA] size mismatch recv=%u expected=%u\n",
-                              (unsigned)s_otaRecv, (unsigned)s_otaSize);
-                otaFail(OTA_STATE_ERR_SIZE);
+            if (otaState != OTA_STATE_RECEIVING) {
+                failOta(OTA_STATE_ERR_SEQ);
                 return;
             }
-            uint32_t finalCrc = s_otaRunningCrc ^ 0xFFFFFFFFUL;
-            if (s_otaExpectedCrc != 0 && finalCrc != s_otaExpectedCrc) {
-                Serial.printf("[OTA] CRC mismatch got=0x%08X expected=0x%08X\n",
-                              (unsigned)finalCrc, (unsigned)s_otaExpectedCrc);
-                otaFail(OTA_STATE_ERR_CRC);
+            if (otaReceived != otaSize) {
+                failOta(OTA_STATE_ERR_SIZE);
+                return;
+            }
+            if ((otaRunningCrc ^ 0xFFFFFFFFUL) != otaExpectedCrc) {
+                failOta(OTA_STATE_ERR_CRC);
                 return;
             }
             if (!Update.end(true)) {
-                Serial.printf("[OTA] Update.end failed: %s\n", Update.errorString());
-                s_otaState = OTA_STATE_ERR_END;
-                s_otaErr   = OTA_STATE_ERR_END;
-                otaPublishStatus();
+                failOta(OTA_STATE_ERR_END);
                 return;
             }
-            Serial.println("[OTA] END ok — image verified, rebooting shortly");
-            s_otaState   = OTA_STATE_DONE;
-            otaPublishStatus();
-            // Defer the reset so the central can read DONE; loopOta() handles it.
-            s_otaRebootAt = millis() + 1500;
+            otaState = OTA_STATE_DONE;
+            otaError = OTA_ERR_NONE;
+            otaRebootAt = millis() + OTA_REBOOT_DELAY_MS;
+            publishOtaStatus();
+            Serial.println(F("[BLE-OTA] verified; reboot scheduled"));
             break;
         }
-        case OTA_OP_ABORT: {
-            if (s_otaState == OTA_STATE_RECEIVING) Update.abort();
-            s_otaState = OTA_STATE_IDLE;
-            s_otaErr   = OTA_ERR_NONE;
-            s_otaRecv  = 0;
-            otaPublishStatus();
-            Serial.println("[OTA] ABORT");
+        case OTA_OP_ABORT:
+            if (otaState == OTA_STATE_RECEIVING) Update.abort();
+            otaState = OTA_STATE_IDLE;
+            otaError = OTA_ERR_NONE;
+            otaReceived = 0;
+            otaRebootAt = 0;
+            publishOtaStatus();
             break;
-        }
         default:
+            failOta(OTA_STATE_ERR_SEQ);
             break;
         }
     }
 };
 
 class OtaDataCallbacks : public NimBLECharacteristicCallbacks {
-    void onWrite(NimBLECharacteristic* c, NimBLEConnInfo& info) override {
-        if (s_otaState != OTA_STATE_RECEIVING) { otaFail(OTA_STATE_ERR_SEQ); return; }
-        NimBLEAttValue v = c->getValue();
-        size_t n = v.size();
-        if (n == 0) return;
-        const uint8_t* p = v.data();
-        // Update.write takes a non-const pointer but does not modify the buffer.
-        if (Update.write(const_cast<uint8_t*>(p), n) != n) {
-            Serial.printf("[OTA] write failed at %u: %s\n",
-                          (unsigned)s_otaRecv, Update.errorString());
-            otaFail(OTA_STATE_ERR_WRITE);
+    void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+        const NimBLEAttValue value = characteristic->getValue();
+        const size_t length = value.size();
+        if (length == 0) return;
+        if (otaState != OTA_STATE_RECEIVING || otaReceived > otaSize ||
+            length > otaSize - otaReceived) {
+            failOta(OTA_STATE_ERR_SEQ);
             return;
         }
-        s_otaRunningCrc = crc32_update(s_otaRunningCrc, p, n);
-        s_otaRecv += n;
+        const uint8_t* data = value.data();
+        if (Update.write(const_cast<uint8_t*>(data), length) != length) {
+            failOta(OTA_STATE_ERR_WRITE);
+            return;
+        }
+        otaRunningCrc = crc32Update(otaRunningCrc, data, length);
+        otaReceived += length;
     }
 };
 
-bool isOtaActive() {
-    return s_otaState == OTA_STATE_RECEIVING ||
-           (s_otaState == OTA_STATE_DONE && s_otaRebootAt != 0);
-}
-
-void loopOta() {
-    if (s_otaState == OTA_STATE_DONE && s_otaRebootAt != 0 &&
-        (long)(millis() - s_otaRebootAt) >= 0) {
-        Serial.println("[OTA] rebooting into new image");
-        Serial.flush();
-        NimBLEDevice::deinit(true);
-        delay(50);
-        ESP.restart();
+class ServerCallbacks : public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer*, NimBLEConnInfo&) override {
+        Serial.println(F("[BLE] HiveHub connected"));
     }
-}
+    void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int reason) override {
+        // A vanished relay must not leave gate sampling paused indefinitely.
+        // The inactive partition is disposable; the running slot is untouched.
+        if (otaState == OTA_STATE_RECEIVING) {
+            failOta(OTA_STATE_ERR_SEQ);
+            Serial.println(F("[BLE-OTA] transfer aborted on disconnect"));
+        }
+        Serial.printf("[BLE] disconnected (reason %d)\n", reason);
+    }
+};
 
-// ===========================================================================
-// Lifecycle
-// ===========================================================================
+}  // namespace
+
 void begin() {
     NimBLEDevice::init(BLE_DEVICE_NAME);
     NimBLEServer* server = NimBLEDevice::createServer();
     server->setCallbacks(new ServerCallbacks(), true);
     server->advertiseOnDisconnect(true);
 
-    NimBLEService* svc = server->createService(SVC_BEECOUNTER);
+    NimBLEService* service = server->createService(SVC_BEECOUNTER);
+    NimBLECharacteristic* measurement = service->createCharacteristic(
+        CHR_MEASUREMENT, NIMBLE_PROPERTY::READ);
+    measurement->setCallbacks(new MeasurementCallbacks(), true);
+    refreshMeasurement(measurement);
 
-    chrMeasurement = svc->createCharacteristic(CHR_MEASUREMENT,
-                        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    NimBLECharacteristic* control = service->createCharacteristic(
+        CHR_OTA_CTRL, NIMBLE_PROPERTY::WRITE);
+    control->setCallbacks(new OtaControlCallbacks(), true);
+    NimBLECharacteristic* payload = service->createCharacteristic(
+        CHR_OTA_DATA, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
+    payload->setCallbacks(new OtaDataCallbacks(), true);
+    otaStatus = service->createCharacteristic(
+        CHR_OTA_STATUS, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    publishOtaStatus();
+    service->start();
 
-    NimBLECharacteristic* chrCtrl = svc->createCharacteristic(CHR_CTRL,
-                        NIMBLE_PROPERTY::WRITE);
-    chrCtrl->setCallbacks(new CtrlCallbacks());
-
-    // Firmware-over-BLE: control + payload (write) and a readable/notifiable status.
-    NimBLECharacteristic* chrOtaCtrl = svc->createCharacteristic(CHR_OTA_CTRL,
-                        NIMBLE_PROPERTY::WRITE);
-    chrOtaCtrl->setCallbacks(new OtaCtrlCallbacks());
-    NimBLECharacteristic* chrOtaData = svc->createCharacteristic(CHR_OTA_DATA,
-                        NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
-    chrOtaData->setCallbacks(new OtaDataCallbacks());
-    chrOtaStatus = svc->createCharacteristic(CHR_OTA_STATUS,
-                        NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-    otaPublishStatus();
-
-    svc->start();
-
-    // Seed the measurement characteristic so the first read has data.
-    publish();
-
-    NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
-    adv->setName(BLE_DEVICE_NAME);
-    adv->addServiceUUID(svc->getUUID());
-    adv->enableScanResponse(true);
-    adv->start();
-    Serial.println("[BLE] BeeCounter GATT server advertising (connectable)");
+    NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+    advertising->setName(BLE_DEVICE_NAME);
+    advertising->addServiceUUID(service->getUUID());
+    advertising->setMinInterval(ADV_INTERVAL_UNITS);
+    advertising->setMaxInterval(ADV_INTERVAL_UNITS);
+    advertising->start();
+    Serial.println(F("[BLE] HiveTraffic advertising for HiveHub"));
 }
 
-void publish() {
-    if (!chrMeasurement) return;
-    Telemetry t;
-    getTelemetry(t);
-    String json = measurementJson(t);
-    if (json.length() > 512) {
-        // Should never happen with the aggregate-only payload, but guard like
-        // HiveInside does rather than let NimBLE reject an oversized value.
-        Serial.printf("[BLE] measurement JSON too large (%u B > 512); not updated\n",
-                      (unsigned)json.length());
-        return;
+bool isOtaActive() {
+    return otaState == OTA_STATE_RECEIVING || otaRebootAt != 0;
+}
+
+void loopOta() {
+    if (otaRebootAt != 0 &&
+        static_cast<int32_t>(millis() - otaRebootAt) >= 0) {
+        Serial.println(F("[BLE-OTA] rebooting into updated firmware"));
+        Serial.flush();
+        delay(50);
+        ESP.restart();
     }
-    chrMeasurement->setValue((uint8_t*)json.c_str(), json.length());
-    chrMeasurement->notify();
 }
 
 }  // namespace ble
