@@ -1,7 +1,5 @@
 #pragma once
 
-#ifdef BEECOUNTER_BLE
-
 #include <stdint.h>
 
 namespace ble {
@@ -23,5 +21,3 @@ bool isOtaActive();
 void loopOta();
 
 }  // namespace ble
-
-#endif  // BEECOUNTER_BLE

@@ -1,14 +1,12 @@
 // HiveHub-compatible BLE/GATT transport for HiveTraffic.
 #include "ble_link.h"
 
-#ifdef BEECOUNTER_BLE
-
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <Update.h>
 #include <stdio.h>
 
-#include "i2c_slave_protocol.h"
+#include "counter_protocol.h"
 #include "version.h"
 
 namespace ble {
@@ -288,5 +286,3 @@ void loopOta() {
 }
 
 }  // namespace ble
-
-#endif  // BEECOUNTER_BLE

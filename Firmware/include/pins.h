@@ -11,8 +11,8 @@
 // The board exposes silk labels D0..D10 + TX_D6/RX_D7 that correspond to:
 //   D0  -> GPIO0
 //   D1  -> GPIO1
-//   D2  -> GPIO2     <-- SDA_HiveScale (2nd I2C, slave to HiveScale)   [NEW]
-//   D3  -> GPIO3     <-- SCL_HiveScale (2nd I2C, slave to HiveScale)   [NEW]
+//   D2  -> GPIO2     <-- SDA_HiveScale (unused: the wired link was removed)
+//   D3  -> GPIO3     <-- SCL_HiveScale (unused: the wired link was removed)
 //   D4  -> GPIO4     <-- /SDA   (I2C data, MCP23017 master bus)
 //   D5  -> GPIO5     <-- /SDC   (I2C clock, schematic spells it "SDC")
 //   D6  -> GPIO6     <-- TX (UART0)            [unused on this board]
@@ -25,24 +25,15 @@
 // they were just net names. Physically they connect to U5 pins 9 and 10 which
 // are silk-labelled D8 and D9, i.e. GPIO8 and GPIO9. Confusing but real.
 //
-// I2C bus layout (DUAL-BUS, 2026-revision)
-// ----------------------------------------
-// The ESP32-C6 has TWO independent I2C controllers. We now use both, which
-// removes the old master/slave time-multiplexing entirely:
+// I2C bus layout
+// --------------
+//   Bus 0 (Wire) — MASTER, GPIO4 (SDA) / GPIO5 (SCL). Talks to the 3x MCP23017
+//                  port expanders. On-board pull-ups R4/R5 (4.7k each).
 //
-//   Bus 0 (Wire)  — MASTER ONLY, GPIO4 (SDA) / GPIO5 (SCL)
-//                   Talks to the 3x MCP23017 port expanders. On-board
-//                   pull-ups R4/R5 (4.7k each). The external J1 SDA/SCL
-//                   traces to the HiveScale have been cut off this net.
-//
-//   Bus 1 (Wire1) — SLAVE ONLY, GPIO2 (SDA_HiveScale) / GPIO3 (SCL_HiveScale)
-//                   Permanently listens at i2c_addr::BEECOUNTER_SLAVE for the
-//                   HiveScale. Pull-ups for this bus come from the HiveScale
-//                   side I2C network (no extra on-board pull-ups required).
-//
-// Because each role now owns its own controller, the HiveScale can poll us
-// at any instant with no risk of a NACK/stretch collision. There is no
-// "slave window", no retry requirement, and REG_BUSY_RETRIES is always 0.
+// The PCB also routes a second bus to J1 on GPIO2/GPIO3, which earlier firmware
+// ran as a permanent I2C slave for a HiveScale. That link is gone: the counter
+// reports over BLE only. The pads and traces are harmless — the firmware simply
+// never brings up the second controller, so the pins stay inputs.
 //
 // MCP23017 addresses (set by A0/A1/A2 strap pins, base 0x20):
 //   U2 -> A0=0 A1=0 A2=0 -> 0x20  (gates 00..07)
@@ -92,10 +83,6 @@ namespace pins {
 constexpr int I2C_SDA           = 2;   // U5 D4 / silk "D4" -> /SDA net
 constexpr int I2C_SCL           = 3;   // U5 D5 / silk "D5" -> /SDC net
 
-// Bus 1 (Wire1) — slave to the HiveScale.                        [NEW]
-constexpr int I2C_HIVE_SDA      = 0;   // U5 D2 / silk "D2" -> SDA_HiveScale
-constexpr int I2C_HIVE_SCL      = 1;   // U5 D3 / silk "D3" -> SCL_HiveScale
-
 constexpr int IR_LED_BANK_1_EN  = 18;   // U5 D8 / silk "D8" -> Q1 gate -> gates 00..13
 constexpr int IR_LED_BANK_2_EN  = 19;   // U5 D9 / silk "D9" -> Q2 gate -> gates 14..27
 
@@ -104,21 +91,13 @@ constexpr int IR_LED_BANK_2_EN  = 19;   // U5 D9 / silk "D9" -> Q2 gate -> gates
 // ---------------------------------------------------------------------------
 // I2C device addresses
 // ---------------------------------------------------------------------------
-#ifndef BEECOUNTER_I2C_ADDRESS
-#define BEECOUNTER_I2C_ADDRESS 0x30   // default; override with -DBEECOUNTER_I2C_ADDRESS=0x31 for hive 2
-#endif
-
+// Only the MCP23017 expanders remain. The counter no longer has a slave address
+// of its own: BEECOUNTER_I2C_ADDRESS (0x30/0x31) existed so two counters could
+// share one HiveScale bus, and hives are told apart by BLE MAC now.
 namespace i2c_addr {
-// MCP23017 expanders (we are MASTER when talking to these, on Wire / bus 0)
 constexpr uint8_t MCP_GATES_00_07 = 0x20;   // U2
 constexpr uint8_t MCP_GATES_10_17 = 0x21;   // U3
 constexpr uint8_t MCP_GATES_20_27 = 0x22;   // U4
-
-// Our own slave address (we are SLAVE to the HiveScale on this address, on
-// Wire1 / bus 1). 0x30 is unused by any device on this board and not in the
-// reserved range.
-// For dual-hive setups, flash the hive-2 unit with -DBEECOUNTER_I2C_ADDRESS=0x31.
-constexpr uint8_t BEECOUNTER_SLAVE = BEECOUNTER_I2C_ADDRESS;
 }  // namespace i2c_addr
 
 // ---------------------------------------------------------------------------

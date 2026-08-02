@@ -1,10 +1,9 @@
 // ============================================================================
-// Easy Bee Counter 2026 — ESP32-C6 mini firmware  (DUAL-I2C revision)
+// HiveTraffic bee counter — ESP32-C6 mini firmware
 // ----------------------------------------------------------------------------
-// Author: rewritten 2026 for the new ESP32-C6 mini board.
-// 2026 revision: split the single shared I2C bus into TWO dedicated buses.
+// Author: rewritten 2026 for the ESP32-C6 mini board.
 //
-// 2026-06 power revision: the IR emitters are now PULSED instead of left on
+// 2026-06 power revision: the IR emitters are PULSED instead of left on
 // continuously. Each poll turns the emitter banks on only for the brief window
 // needed to settle the phototransistors and read the MCP23017s, then turns
 // them off again. At the default POLL_INTERVAL_MS=5 / LED_SETTLE_US=250 with a
@@ -15,49 +14,41 @@
 // What this firmware does
 // -----------------------
 //   1. Continuously polls 24 entrance gates (each gate = Inner IR sensor +
-//      Outer IR sensor) through three MCP23017 I2C port expanders.
+//      Outer IR sensor) through three MCP23017 I2C port expanders on Wire.
 //   2. Detects directional bee crossings:
 //        Outer-then-Inner = bee entered the hive   -> "in" counter++
 //        Inner-then-Outer = bee left the hive      -> "out" counter++
-//   3. Maintains lifetime totals, per-interval totals, and per-gate detail.
-//   4. Acts as an I2C slave at address 0x30 on a SEPARATE bus so the main
-//      HiveScale ESP32 can poll it at any time without any timing constraints.
+//   3. Maintains LIFETIME totals, and serves them over BLE/GATT to HiveHub,
+//      which differences consecutive reads into per-interval counts.
+//   4. Accepts a firmware image over the same GATT service (see ble_link.cpp),
+//      verifying size and CRC-32 before swapping app slots.
 //
-// Dual-bus hardware layout (NEW)
-// ------------------------------
-// The ESP32-C6 has TWO independent I2C controllers, so we now dedicate one to
-// each role and never switch modes:
+// The wired HiveScale link is gone
+// --------------------------------
+// Earlier revisions ran the C6's second I2C controller as a permanent slave at
+// 0x30, serving a register map (lifetime totals, per-interval counters reset by
+// CMD_LATCH, per-gate arrays, and an OTA-over-I2C block) to a HiveScale polling
+// over J1. All of it has been removed: HiveHub reads counters over BLE only and
+// dropped its wired client, so nothing spoke that protocol anymore.
 //
-//   Wire   (bus 0): MASTER only, GPIO4/GPIO5  -> the 3x MCP23017s.
-//   Wire1  (bus 1): SLAVE  only, GPIO2/GPIO3  -> the HiveScale link.
-//
-// The external HiveScale connector is wired to GPIO2 (SDA_HiveScale) and
-// GPIO3 (SCL_HiveScale). Pull-ups for that bus are provided by the HiveScale
-// I2C network. The old J1<->GPIO4/5 SDA/SCL traces are cut.
-//
-// Consequences vs. the old single-bus firmware:
-//   - No master/slave time-multiplexing, no "slave window" scheduler.
-//   - The HiveScale can start a transaction at any instant; it can never
-//     collide with an MCP read, so no NACK/stretch retry is required.
-//   - REG_BUSY_RETRIES is retained in the protocol for compatibility but is
-//     now always 0.
+// What that removal simplifies, and why the code no longer mentions it:
+//   - No slave callbacks, no register pointer, no ISR-context response buffer.
+//   - No interval or per-gate counters. The wire format is totals-only, so a
+//     missed connection cannot lose traffic — there is nothing to latch and
+//     nothing to reset.
+//   - One I2C bus, used only as a master for the MCP23017s.
 // ============================================================================
 
 #include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_MCP23X17.h>
-#include <Update.h>          // ESP32 OTA writer (esp_ota under the hood)
 
 #include "pins.h"
-#include "i2c_slave_protocol.h"
+#include "counter_protocol.h"
 
-// Optional BLE/GATT transport (compile-time alternative to the I2C slave; see
-// ble_link.h and platformio.ini). When -DBEECOUNTER_BLE is set the Wire1 slave
-// and the OTA-over-I2C path are compiled out and replaced by a connectable
-// NimBLE GATT server, mirroring HiveInside's wireless transfer.
-#ifdef BEECOUNTER_BLE
+// The BLE/GATT transport: a connectable NimBLE GATT server serving the
+// measurement characteristic and the OTA characteristics. See ble_link.h.
 #include "ble_link.h"
-#endif
 
 // ============================================================================
 // Compile-time tuning knobs — keep these together for easy field adjustment
@@ -93,10 +84,6 @@ static constexpr uint32_t SENSOR_STUCK_MS = 30000;
 // on-time and CPU blocking roughly 3-4x versus the former 100 kHz default. Fall
 // back to 100 kHz if an assembled board cannot meet fast-mode signal integrity.
 static constexpr uint32_t I2C_MASTER_HZ = 400000;
-
-// I2C clock for the HiveScale slave bus. As a slave the C6 follows the
-// master's clock; this value is only the controller's configured rate.
-static constexpr uint32_t I2C_SLAVE_HZ = 100000;
 
 // ---------------------------------------------------------------------------
 // Pulsed-LED sampling
@@ -160,31 +147,16 @@ struct GateRuntime {
     uint32_t outer_stuck_since_ms = 0;
 };
 
-// Per-gate live (currently filling) and shadow (last-latched, served to
-// HiveScale) counters for IN/OUT. uint8_t per gate clipped at 255 — over a
-// 10-minute interval, 255 bees per gate is already an extreme rate.
-struct GateCounters {
-    uint8_t in  = 0;
-    uint8_t out = 0;
-};
+static GateRuntime g_gate_rt[gates::NUM_GATES];
 
-static GateRuntime  g_gate_rt[gates::NUM_GATES];
-static GateCounters g_gate_live[gates::NUM_GATES];
-static GateCounters g_gate_shadow[gates::NUM_GATES];
-
-// Aggregate counters.
-//   *_live   = accumulating right now; reset on CMD_LATCH
-//   *_shadow = what we hand to the HiveScale; updated atomically on LATCH
-//   *_total  = lifetime, never reset (except on CMD_CLEAR_TOTALS)
-static volatile uint32_t g_interval_in_live  = 0;
-static volatile uint32_t g_interval_out_live = 0;
-static volatile uint32_t g_interval_in_shadow  = 0;
-static volatile uint32_t g_interval_out_shadow = 0;
+// Aggregate counters. LIFETIME totals only: the BLE contract is totals-only and
+// HiveHub derives each interval by differencing consecutive reads, so a missed
+// connection can never lose traffic. (The wired path additionally kept
+// per-interval and per-gate counters, zeroed by CMD_LATCH; both went with it.)
 static volatile uint32_t g_total_in  = 0;
 static volatile uint32_t g_total_out = 0;
 
 static volatile uint16_t g_glitch_count  = 0;
-static volatile uint16_t g_busy_retries  = 0;   // retained, always 0 now
 static volatile uint8_t  g_status_flags  = 0;
 
 // ============================================================================
@@ -207,45 +179,6 @@ enum class LedMode : uint8_t { AUTO, FORCE_ON, FORCE_OFF };
 static volatile LedMode g_led_mode = LedMode::AUTO;
 
 // ============================================================================
-// I2C slave-callback state (shared with ISR context)
-// ============================================================================
-//
-// Wire1 invokes onReceive()/onRequest() in an ISR-ish callback context. We
-// keep the work tiny: stash the register pointer on receive, and on request
-// stream bytes from a locally-built response buffer. Counter reads are of
-// volatile snapshots updated by the main loop; a torn multi-byte read is
-// harmless here because the HiveScale re-reads each interval and we only ever
-// hand out the latched *shadow* values, which the main loop updates only
-// inside a noInterrupts() block on CMD_LATCH.
-// ============================================================================
-
-#ifndef BEECOUNTER_BLE
-static volatile uint8_t  g_reg_pointer = beecounter_proto::REG_STATUS;
-
-// ----------------------------------------------------------------------------
-// OTA-over-I2C state (PROTOCOL_VERSION >= 2). Written from the Wire1 slave
-// callback context, read by loop(). g_ota_active pauses gate polling for the
-// duration of a transfer; g_ota_reboot defers the restart until loop() runs,
-// so the HiveScale gets a chance to read OTA_STATE_DONE first.
-//
-// In the BLE build (-DBEECOUNTER_BLE) this whole block is replaced by the
-// firmware-over-BLE state machine in ble_link.cpp.
-// ----------------------------------------------------------------------------
-static volatile bool     g_ota_active       = false;
-static volatile bool     g_ota_reboot       = false;
-static volatile uint8_t  g_ota_state        = beecounter_proto::OTA_STATE_IDLE;
-static volatile uint8_t  g_ota_err          = beecounter_proto::OTA_ERR_NONE;
-static volatile uint32_t g_ota_size         = 0;            // declared image size
-static volatile uint32_t g_ota_expected_crc = 0;            // declared CRC32
-static volatile uint32_t g_ota_received     = 0;            // bytes written so far
-static volatile uint32_t g_ota_running_crc  = 0xFFFFFFFFu;  // CRC accumulator
-
-// Response buffer: enough room for the largest single-read register block.
-// The biggest is REG_PER_GATE_IN (24 bytes) or REG_PER_GATE_OUT (24 bytes).
-static constexpr size_t SLAVE_TX_BUF_SIZE = 32;
-#endif  // !BEECOUNTER_BLE
-
-// ============================================================================
 // Low-level helpers
 // ============================================================================
 
@@ -262,7 +195,7 @@ static void driveIrLeds(bool on) {
 }
 
 // Apply a steady LED state honouring the mode overrides. Used when the mode
-// changes (e.g. CMD_LEDS_ON/OFF) and at boot. In AUTO mode the steady state is
+// changes (the IR_DEBUG console's '1'/'0'/'a' keys) and at boot. In AUTO mode the steady state is
 // OFF — the emitters are only lit transiently by the pulsed sampler — so a
 // call here with on=true while in AUTO is treated as "leave pulsing to the
 // sampler" and forces the steady level OFF.
@@ -273,31 +206,6 @@ static void setIrLeds(bool on) {
     driveIrLeds(on);
 }
 
-#ifndef BEECOUNTER_BLE
-// Big-endian encode helpers (I2C slave response framing).
-static void writeU16BE(uint8_t* buf, uint16_t v) {
-    buf[0] = (uint8_t)(v >> 8);
-    buf[1] = (uint8_t)(v & 0xFF);
-}
-static void writeU32BE(uint8_t* buf, uint32_t v) {
-    buf[0] = (uint8_t)(v >> 24);
-    buf[1] = (uint8_t)(v >> 16);
-    buf[2] = (uint8_t)(v >> 8);
-    buf[3] = (uint8_t)(v & 0xFF);
-}
-
-// Incremental CRC-32 (IEEE 802.3, poly 0xEDB88320). Seed 0xFFFFFFFF, finalize
-// by XOR 0xFFFFFFFF. Must match the HiveScale and backend (zlib.crc32).
-static uint32_t crc32_update(uint32_t crc, const uint8_t* data, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        crc ^= data[i];
-        for (uint8_t b = 0; b < 8; b++) {
-            crc = (crc & 1) ? (crc >> 1) ^ 0xEDB88320u : (crc >> 1);
-        }
-    }
-    return crc;
-}
-#endif  // !BEECOUNTER_BLE
 
 // ============================================================================
 // Crossing detection
@@ -363,8 +271,6 @@ static void updateGate(uint8_t gate_idx, bool raw_inner, bool raw_outer,
         } else if (rt.outer_blocked) {
             // direction confirmed
             g_total_out += 1;
-            g_interval_out_live += 1;
-            if (g_gate_live[gate_idx].out < 255) g_gate_live[gate_idx].out++;
             rt.state = GateState::PAIRED;
         } else if (!rt.inner_blocked) {
             // inner cleared before outer ever blocked: false start
@@ -381,8 +287,6 @@ static void updateGate(uint8_t gate_idx, bool raw_inner, bool raw_outer,
             }
         } else if (rt.inner_blocked) {
             g_total_in += 1;
-            g_interval_in_live += 1;
-            if (g_gate_live[gate_idx].in < 255) g_gate_live[gate_idx].in++;
             rt.state = GateState::PAIRED;
         } else if (!rt.outer_blocked) {
             rt.state = GateState::IDLE;
@@ -629,45 +533,6 @@ static void irDebugPoll() {
 
 #endif  // IR_DEBUG
 
-// ============================================================================
-// Wired control-command handling (REG_CTRL)
-// ============================================================================
-//
-// Wired I2C command handling. The HiveHub BLE contract is intentionally
-// read-only and totals-only, so this is compiled out of the wireless image.
-#ifndef BEECOUNTER_BLE
-static void applyCtrlCommand(uint8_t cmd) {
-    switch (cmd) {
-    case beecounter_proto::CMD_LATCH:
-        // Atomically copy live -> shadow, then zero live.
-        noInterrupts();
-        g_interval_in_shadow  = g_interval_in_live;
-        g_interval_out_shadow = g_interval_out_live;
-        g_interval_in_live  = 0;
-        g_interval_out_live = 0;
-        for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
-            g_gate_shadow[i] = g_gate_live[i];
-            g_gate_live[i]   = {0, 0};
-        }
-        interrupts();
-        break;
-    case beecounter_proto::CMD_CLEAR_TOTALS:
-        g_total_in  = 0;
-        g_total_out = 0;
-        break;
-    case beecounter_proto::CMD_CLEAR_FAULTS:
-        g_status_flags &= ~(beecounter_proto::STATUS_SENSOR_FAULT_FLAG |
-                            beecounter_proto::STATUS_OVERFLOW_FLAG);
-        break;
-    case beecounter_proto::CMD_LEDS_OFF:  g_led_mode = LedMode::FORCE_OFF; break;
-    case beecounter_proto::CMD_LEDS_ON:   g_led_mode = LedMode::FORCE_ON;  break;
-    case beecounter_proto::CMD_LEDS_AUTO: g_led_mode = LedMode::AUTO;       break;
-    default: break;
-    }
-}
-#endif
-
-#ifdef BEECOUNTER_BLE
 // ----------------------------------------------------------------------------
 // BLE transport callbacks (defined here because the counter state lives in this
 // translation unit). ble_link.cpp drives the GATT server and calls into these.
@@ -690,167 +555,7 @@ void getTelemetry(Telemetry& t) {
 }
 
 }  // namespace ble
-#endif  // BEECOUNTER_BLE
 
-#ifndef BEECOUNTER_BLE
-// ============================================================================
-// I2C slave (Wire1) callbacks — registered once in setup(), never torn down
-// ============================================================================
-
-static void onSlaveReceive(int n_bytes) {
-    // The HiveScale wrote n_bytes to us. The first byte is the register
-    // pointer; any further bytes are command payload (only REG_CTRL takes a
-    // payload byte).
-    if (n_bytes <= 0) return;
-    uint8_t reg = (uint8_t)Wire1.read();
-    g_reg_pointer = reg;
-    if (reg == beecounter_proto::REG_CTRL && n_bytes >= 2) {
-        uint8_t cmd = (uint8_t)Wire1.read();
-        applyCtrlCommand(cmd);
-    }
-    // ---- OTA-over-I2C frames (PROTOCOL_VERSION >= 2) ----
-    else if (reg == beecounter_proto::REG_OTA_BEGIN) {
-        // 8 payload bytes: size(4 BE) + crc32(4 BE).
-        if (n_bytes >= 9) {
-            uint8_t b[8];
-            for (uint8_t i = 0; i < 8; i++) b[i] = (uint8_t)Wire1.read();
-            uint32_t size = ((uint32_t)b[0] << 24) | ((uint32_t)b[1] << 16) |
-                            ((uint32_t)b[2] << 8)  | (uint32_t)b[3];
-            uint32_t crc  = ((uint32_t)b[4] << 24) | ((uint32_t)b[5] << 16) |
-                            ((uint32_t)b[6] << 8)  | (uint32_t)b[7];
-            g_ota_size         = size;
-            g_ota_expected_crc = crc;
-            g_ota_received     = 0;
-            g_ota_running_crc  = 0xFFFFFFFFu;
-            if (Update.begin(size)) {
-                g_ota_active = true;
-                g_ota_state  = beecounter_proto::OTA_STATE_RECEIVING;
-                g_ota_err    = beecounter_proto::OTA_ERR_NONE;
-            } else {
-                g_ota_active = false;
-                g_ota_state  = beecounter_proto::OTA_STATE_ERR_BEGIN;
-            }
-        }
-    }
-    else if (reg == beecounter_proto::REG_OTA_DATA) {
-        // offset(4 BE) + data bytes.
-        if (g_ota_active && n_bytes >= 5) {
-            uint8_t ob[4];
-            for (uint8_t i = 0; i < 4; i++) ob[i] = (uint8_t)Wire1.read();
-            uint32_t offset = ((uint32_t)ob[0] << 24) | ((uint32_t)ob[1] << 16) |
-                              ((uint32_t)ob[2] << 8)  | (uint32_t)ob[3];
-            if (offset != g_ota_received) {
-                Update.abort();
-                g_ota_active = false;
-                g_ota_state  = beecounter_proto::OTA_STATE_ERR_SEQ;
-            } else {
-                uint8_t data[beecounter_proto::OTA_CHUNK_MAX];
-                int dn = 0;
-                while (Wire1.available() && dn < (int)sizeof(data)) {
-                    data[dn++] = (uint8_t)Wire1.read();
-                }
-                size_t w = Update.write(data, dn);
-                if ((int)w != dn) {
-                    Update.abort();
-                    g_ota_active = false;
-                    g_ota_state  = beecounter_proto::OTA_STATE_ERR_WRITE;
-                } else {
-                    g_ota_running_crc = crc32_update(g_ota_running_crc, data, dn);
-                    g_ota_received += dn;
-                }
-            }
-        }
-    }
-    else if (reg == beecounter_proto::REG_OTA_END) {
-        if (g_ota_active) {
-            uint32_t final_crc = g_ota_running_crc ^ 0xFFFFFFFFu;
-            if (g_ota_received != g_ota_size) {
-                Update.abort();
-                g_ota_state = beecounter_proto::OTA_STATE_ERR_SIZE;
-            } else if (final_crc != g_ota_expected_crc) {
-                Update.abort();
-                g_ota_state = beecounter_proto::OTA_STATE_ERR_CRC;
-            } else if (!Update.end(true)) {
-                g_ota_state = beecounter_proto::OTA_STATE_ERR_END;
-            } else {
-                g_ota_state  = beecounter_proto::OTA_STATE_DONE;
-                g_ota_reboot = true;   // loop() performs the actual restart
-            }
-            g_ota_active = false;
-        }
-    }
-    else if (reg == beecounter_proto::REG_OTA_ABORT) {
-        if (g_ota_active) {
-            Update.abort();
-            g_ota_active = false;
-            g_ota_state  = beecounter_proto::OTA_STATE_IDLE;
-        }
-    }
-}
-
-static void onSlaveRequest() {
-    // Build a response for whatever register the master last pointed at.
-    uint8_t buf[SLAVE_TX_BUF_SIZE];
-    size_t n = 0;
-
-    switch (g_reg_pointer) {
-    case beecounter_proto::REG_PROTOCOL_VERSION:
-        buf[n++] = beecounter_proto::PROTOCOL_VERSION;
-        break;
-    case beecounter_proto::REG_STATUS:
-        buf[n++] = g_status_flags;
-        break;
-    case beecounter_proto::REG_UPTIME_S: {
-        uint32_t up = millis() / 1000;
-        if (up > 0xFFFF) up = 0xFFFF;
-        writeU16BE(buf, (uint16_t)up);
-        n = 2;
-        break;
-    }
-    case beecounter_proto::REG_NUM_GATES:
-        buf[n++] = gates::NUM_GATES;
-        break;
-    case beecounter_proto::REG_GATES_HEALTHY:
-        buf[n++] = (uint8_t)((g_mcp_u2_ok ? 1 : 0) +
-                             (g_mcp_u3_ok ? 1 : 0) +
-                             (g_mcp_u4_ok ? 1 : 0));
-        break;
-    case beecounter_proto::REG_TOTAL_IN:
-        writeU32BE(buf, g_total_in);  n = 4; break;
-    case beecounter_proto::REG_TOTAL_OUT:
-        writeU32BE(buf, g_total_out); n = 4; break;
-    case beecounter_proto::REG_INTERVAL_IN:
-        writeU32BE(buf, g_interval_in_shadow);  n = 4; break;
-    case beecounter_proto::REG_INTERVAL_OUT:
-        writeU32BE(buf, g_interval_out_shadow); n = 4; break;
-    case beecounter_proto::REG_GLITCH_COUNT:
-        writeU16BE(buf, g_glitch_count); n = 2; break;
-    case beecounter_proto::REG_BUSY_RETRIES:
-        writeU16BE(buf, g_busy_retries); n = 2; break;
-    case beecounter_proto::REG_PER_GATE_IN:
-        for (uint8_t i = 0; i < gates::NUM_GATES && n < sizeof(buf); i++)
-            buf[n++] = g_gate_shadow[i].in;
-        break;
-    case beecounter_proto::REG_PER_GATE_OUT:
-        for (uint8_t i = 0; i < gates::NUM_GATES && n < sizeof(buf); i++)
-            buf[n++] = g_gate_shadow[i].out;
-        break;
-    case beecounter_proto::REG_OTA_STATUS: {
-        // state(1) + received(4 BE) + err(1)
-        buf[0] = g_ota_state;
-        writeU32BE(buf + 1, g_ota_received);
-        buf[5] = g_ota_err;
-        n = 6;
-        break;
-    }
-    default:
-        buf[n++] = 0xFF;   // unknown register
-        break;
-    }
-
-    Wire1.write(buf, n);
-}
-#endif  // !BEECOUNTER_BLE
 
 // ============================================================================
 // Bring-up helpers
@@ -871,18 +576,6 @@ static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
     return true;
 }
 
-#ifndef BEECOUNTER_BLE
-static void initHiveSlaveBus() {
-    Wire1.begin((uint8_t)i2c_addr::BEECOUNTER_SLAVE,
-                pins::I2C_HIVE_SDA, pins::I2C_HIVE_SCL,
-                (uint32_t)I2C_SLAVE_HZ);
-    Wire1.onReceive(onSlaveReceive);
-    Wire1.onRequest(onSlaveRequest);
-    Serial.printf("[I2C] HiveScale slave bus up on GPIO%d/%d @ 0x%02X\n",
-                  pins::I2C_HIVE_SDA, pins::I2C_HIVE_SCL,
-                  (unsigned)i2c_addr::BEECOUNTER_SLAVE);
-}
-#endif  // !BEECOUNTER_BLE
 
 // ============================================================================
 // Arduino setup() / loop()
@@ -895,11 +588,7 @@ void setup() {
     delay(200);
     Serial.println();
     Serial.println("==============================================");
-#ifdef BEECOUNTER_BLE
     Serial.println("Easy Bee Counter 2026 — firmware booting (BLE/GATT link)");
-#else
-    Serial.println("Easy Bee Counter 2026 — firmware booting (dual-I2C)");
-#endif
     Serial.println("==============================================");
 
     // Configure LED enable pins -- start with LEDs off so we can verify
@@ -909,7 +598,8 @@ void setup() {
     digitalWrite(pins::IR_LED_BANK_1_EN, LOW);
     digitalWrite(pins::IR_LED_BANK_2_EN, LOW);
 
-    // Bus 0 (Wire): permanent MASTER for the MCP23017s.
+    // The MCP23017 bus. There is only one bus now: the second I2C controller
+    // used to run a permanent slave for the HiveScale, and that link is gone.
     Wire.begin(pins::I2C_SDA, pins::I2C_SCL, (uint32_t)I2C_MASTER_HZ);
 
     g_mcp_u2_ok = initMcp(g_mcp_u2, i2c_addr::MCP_GATES_00_07, "U2 (gates 00..07)");
@@ -920,14 +610,7 @@ void setup() {
     if (g_mcp_u3_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U3_OK;
     if (g_mcp_u4_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U4_OK;
 
-    // HiveScale link: either the wired I2C slave (default) or the wireless BLE
-    // GATT server (-DBEECOUNTER_BLE). Exactly one is compiled in.
-#ifdef BEECOUNTER_BLE
-    ble::begin();   // connectable NimBLE GATT server on GPIO-less radio
-#else
-    // Bus 1 (Wire1): permanent SLAVE for the HiveScale on GPIO2/GPIO3.
-    initHiveSlaveBus();
-#endif
+    ble::begin();   // connectable NimBLE GATT server on the GPIO-less radio
 
     // Emitters now default to PULSED (AUTO): they stay dark between samples and
     // are lit only for the settle+read window inside pollAllGates(). Leave the
@@ -950,17 +633,9 @@ void setup() {
 }
 
 void loop() {
-#ifdef BEECOUNTER_BLE
+    // Services the deferred post-OTA reboot, once the central has had a chance
+    // to read DONE off the status characteristic.
     ble::loopOta();
-#else
-    // Deferred reboot: the HiveScale has had a chance to read OTA_STATE_DONE
-    // from REG_OTA_STATUS, so it's safe to restart into the new firmware.
-    if (g_ota_reboot) {
-        Serial.println("[OTA] verified — rebooting into new firmware");
-        delay(50);            // let any in-flight I2C ack settle
-        ESP.restart();
-    }
-#endif
 
     const uint32_t now = millis();
 
@@ -969,17 +644,11 @@ void loop() {
     irDebugPoll();
 #endif
 
-    // ---- Master work: poll the MCP23017s every POLL_INTERVAL_MS ----
-    // The HiveScale slave bus (Wire1) is serviced asynchronously by its
-    // onReceive/onRequest callbacks, so the loop body only does master work.
-    // Both OTA transports pause sensing so flash writes and BLE/I2C callbacks
-    // cannot leave an emitter pulse active or corrupt a crossing in progress.
-#ifdef BEECOUNTER_BLE
-    const bool ota_busy = ble::isOtaActive();
-#else
-    const bool ota_busy = g_ota_active;
-#endif
-    if (ota_busy) {
+    // ---- Poll the MCP23017s every POLL_INTERVAL_MS ----
+    // An OTA pauses sensing: flash writes must not leave an emitter pulse
+    // active or corrupt a crossing in progress. Counting is deliberately
+    // sacrificed for the duration of a transfer.
+    if (ble::isOtaActive()) {
         driveIrLeds(false);
     } else if (now - g_last_poll_ms >= POLL_INTERVAL_MS) {
         g_last_poll_ms = now;
@@ -1001,12 +670,10 @@ void loop() {
         last_dump_ms = now;
         Serial.printf(
             "[STAT] uptime=%lus total_in=%lu total_out=%lu "
-            "interval_in_live=%lu interval_out_live=%lu glitches=%u status=0x%02X\n",
+            "glitches=%u status=0x%02X\n",
             (unsigned long)(now / 1000),
             (unsigned long)g_total_in,
             (unsigned long)g_total_out,
-            (unsigned long)g_interval_in_live,
-            (unsigned long)g_interval_out_live,
             (unsigned)g_glitch_count,
             (unsigned)g_status_flags
         );

@@ -1,16 +1,16 @@
 # Wireless HiveHub mode (BLE/GATT)
 
-The `esp32-c6-devkitc-1-ble` build is compatible with the wireless
-**HiveTraffic counter** client in [MacNite/HiveHub](https://github.com/MacNite/HiveHub).
-HiveHub's current bee-counter transport is BLE-only; its former wired I2C
-client has been removed.
+BLE/GATT is the counter's only transport, and this is the only build. It pairs
+with the wireless **HiveTraffic counter** client in
+[MacNite/HiveHub](https://github.com/MacNite/HiveHub); the wired I2C link, and
+HiveHub's client for it, have both been removed.
 
 ## Build and pair
 
 ```sh
 cd Firmware
-pio run -e esp32-c6-devkitc-1-ble
-pio run -e esp32-c6-devkitc-1-ble -t upload
+pio run
+pio run -t upload
 ```
 
 Build HiveHub with `ENABLE_WIRELESS_BEECOUNTER=1`, then pair the counter's BLE
@@ -72,13 +72,15 @@ locates it by scan before connecting.
 calculate intervals. The BLE client does not latch or reset the counter after
 a read, so an unavailable upload cycle does not discard traffic.
 
-This differs from legacy wired I2C mode, which has interval registers and
-`CMD_LATCH`. Use BLE with current HiveHub; the default I2C build remains only
-for older or custom HiveScale firmware.
+This is why the device keeps no interval state at all. The retired wired
+protocol had interval registers a `CMD_LATCH` command consumed, which meant a
+HiveScale that read but failed to latch — or latched but failed to read —
+silently lost an interval. Differencing totals cannot lose anything: a read is
+not a consumption.
 
 ## Power and performance choices
 
-* Measurement JSON uses a fixed 192-byte stack buffer, without ArduinoJson or
+* Measurement JSON uses a fixed 224-byte stack buffer, without ArduinoJson or
   `String` heap churn.
 * Telemetry is serialized only on a GATT read, not every two seconds.
 * The measurement path remains read-only; OTA uses three separate
@@ -123,8 +125,8 @@ can reuse the HiveInside streaming state machine.
   receiving `0x01`, done `0x02`, or errors `0x10` through `0x15`.
 
 CRC is standard IEEE/zlib CRC-32 (`0xEDB88320`, initial/final XOR
-`0xFFFFFFFF`). Upload PlatformIO's application-only `firmware.bin` from the BLE
-environment, not a merged factory image. `Update.begin()` rejects an image that
+`0xFFFFFFFF`). Upload PlatformIO's application-only `firmware.bin`, not a
+merged factory image. `Update.begin()` rejects an image that
 cannot fit the inactive partition.
 
 Gate polling pauses and the emitters remain off during transfer. A disconnect
@@ -135,7 +137,7 @@ size, CRC, interrupted link, or ABORT leaves the running image bootable.
 ### The HiveHub relay
 
 HiveHub implements this as the `update_beecounter` command. Its HiveInside
-HTTPS-to-GATT relay is parameterised over a `blesensor::OtaTarget` descriptor
+HTTPS-to-GATT relay is parameterised over a `gattota::Target` descriptor
 (service + control/data/status UUIDs), so HiveTraffic reuses the same streaming
 state machine with the `8e8b01xx` UUIDs above:
 
@@ -149,8 +151,8 @@ state machine with the `8e8b01xx` UUIDs above:
 4. The counter reboots and re-advertises; the next measurement read picks up the
    new `ver`, which is what confirms the update took.
 
-Build the image from the BLE environment and name it so the backend can stamp
-the board — `beecounter_esp32-c6_<version>.bin`.
+Name the built image so the backend can stamp the board —
+`beecounter_esp32-c6_<version>.bin`.
 
 The service has no authentication. Deployment therefore relies on BLE radio
 proximity and ESP image validation; signed/authenticated firmware is recommended

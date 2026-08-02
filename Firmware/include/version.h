@@ -3,9 +3,9 @@
 // Firmware version of this HiveTraffic build.
 //
 // This is the *image* version, and is deliberately separate from
-// beecounter_proto::PROTOCOL_VERSION (i2c_slave_protocol.h), which versions the
-// wire format only. The two move independently: a bug fix that changes no
-// registers bumps this and leaves the protocol version alone.
+// beecounter_proto::PROTOCOL_VERSION (counter_protocol.h), which versions the
+// reported measurement format. The two move independently: a bug fix that
+// changes no reported fields bumps this and leaves the format revision alone.
 //
 // It is reported over BLE as the measurement JSON's "ver" field so a HiveHub
 // relay can tell what a counter is running. HiveHub compares it with
