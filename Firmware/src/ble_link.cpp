@@ -1,14 +1,13 @@
 // HiveHub-compatible BLE/GATT transport for HiveTraffic.
 #include "ble_link.h"
 
-#ifdef BEECOUNTER_BLE
-
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <Update.h>
 #include <stdio.h>
 
-#include "i2c_slave_protocol.h"
+#include "counter_protocol.h"
+#include "version.h"
 
 namespace ble {
 namespace {
@@ -75,14 +74,17 @@ static void failOta(uint8_t state) {
 static void refreshMeasurement(NimBLECharacteristic* characteristic) {
     Telemetry t{};
     getTelemetry(t);
-    char json[192];
+    // 224 bytes, not 192: the worst-case document (all fields saturated) is
+    // ~155 bytes with "ver" included, and a longer version string must not be
+    // able to push it over. snprintf truncation is caught below either way.
+    char json[224];
     const int length = snprintf(
         json, sizeof(json),
-        "{\"fw\":%u,\"uptime_s\":%u,\"status\":%u,\"num_gates\":%u,"
-        "\"gates_healthy\":%u,\"total_in\":%lu,\"total_out\":%lu,"
-        "\"glitches\":%u}",
-        t.protocol_version, t.uptime_s, t.status_flags, t.num_gates,
-        t.gates_healthy, static_cast<unsigned long>(t.total_in),
+        "{\"fw\":%u,\"ver\":\"%s\",\"uptime_s\":%u,\"status\":%u,"
+        "\"num_gates\":%u,\"gates_healthy\":%u,\"total_in\":%lu,"
+        "\"total_out\":%lu,\"glitches\":%u}",
+        t.protocol_version, HIVETRAFFIC_FW_VERSION, t.uptime_s, t.status_flags,
+        t.num_gates, t.gates_healthy, static_cast<unsigned long>(t.total_in),
         static_cast<unsigned long>(t.total_out), t.glitch_count);
     if (length <= 0 || static_cast<size_t>(length) >= sizeof(json)) {
         Serial.println(F("[BLE] measurement serialization failed"));
@@ -237,12 +239,36 @@ void begin() {
     service->start();
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
-    advertising->setName(BLE_DEVICE_NAME);
+    // The name goes in the SCAN RESPONSE, not the advertisement. A legacy
+    // advertising PDU holds 31 bytes, and the two elements HiveHub cares about
+    // do not both fit alongside a name:
+    //
+    //     flags                 3   (added by NimBLE at start())
+    //     128-bit service UUID  18  (2 + 16)
+    //     "BeeCounter"          12  (2 + 10)   -> 33 > 31
+    //
+    // NimBLE 2.x leaves scan response DISABLED by default and does not silently
+    // relocate the name, so setting all three on the advertisement overflows and
+    // something is dropped — potentially advertising itself. A counter that does
+    // not advertise is invisible to BOTH the measurement read and the OTA relay,
+    // which locates it by a scan first (HiveHub ble_sensor.cpp::otaBegin).
+    // Splitting them keeps the advertisement at 21 bytes and the scan response
+    // at 12, with room to spare on each.
     advertising->addServiceUUID(service->getUUID());
+    NimBLEAdvertisementData scanResponse;
+    scanResponse.setName(BLE_DEVICE_NAME);
+    advertising->setScanResponseData(scanResponse);
+    advertising->enableScanResponse(true);
     advertising->setMinInterval(ADV_INTERVAL_UNITS);
     advertising->setMaxInterval(ADV_INTERVAL_UNITS);
-    advertising->start();
-    Serial.println(F("[BLE] HiveTraffic advertising for HiveHub"));
+    if (!advertising->start()) {
+        // Never fail silently: without this the only symptom is a counter that
+        // HiveHub can never see, with nothing on the serial log to say why.
+        Serial.println(F("[BLE] ERROR: advertising failed to start"));
+        return;
+    }
+    Serial.printf("[BLE] HiveTraffic %s advertising for HiveHub\n",
+                  HIVETRAFFIC_FW_VERSION);
 }
 
 bool isOtaActive() {
@@ -260,5 +286,3 @@ void loopOta() {
 }
 
 }  // namespace ble
-
-#endif  // BEECOUNTER_BLE

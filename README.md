@@ -1,10 +1,10 @@
 # Bee Counter Redesign — Full Specification
-### Single PCB + 3D Printed Housing, integrated with HiveScale
+### Single PCB + 3D Printed Housing, reported over BLE to HiveHub
 
 A redesign of the [2019-easy-bee-counter](https://github.com/hydronics2/2019-easy-bee-counter)
 by hydronics2: 24 entrance gates, 48 reflective IR sensors read through I²C
-port expanders, an always-on ESP32-C6 doing the counting, and a HiveScale
-ESP32 that aggregates counts with weight/timestamp data.
+port expanders, and an always-on ESP32-C6 doing the counting and reporting
+totals over BLE.
 
 > **Status:** the PCB (`PCB_files/easy-bee-counter-2026.kicad_*`) and the
 > ESP32-C6 firmware (`Firmware/`) are implemented. The 3D-printed housing
@@ -14,26 +14,26 @@ ESP32 that aggregates counts with weight/timestamp data.
 
 ## 1. System Overview
 
-Two-MCU architecture. The **ESP32-C6 mini** runs always-on as a dedicated bee
-counter. The HiveScale ESP32 sleeps, wakes roughly every 10 minutes, reads the
-buffered counts from the C6 over a dedicated I²C link, combines them with
-weight/timestamp data, then logs and transmits.
+The **ESP32-C6 mini** runs always-on as a dedicated bee counter and advertises
+as a connectable BLE peripheral. A HiveHub wakes roughly every 10 minutes,
+connects, reads one JSON characteristic of lifetime totals and disconnects,
+combining the counts with weight/timestamp data before logging and transmitting.
 
 ```
-[HiveScale ESP32] ←—I²C (bus 1)——→ [ESP32-C6 mini]
+[HiveHub ESP32] ←——— BLE/GATT ———→ [ESP32-C6 mini]
   wakes every ~10 min                always-on, ~15 mA
-  RTC, SD, WiFi, scale               bee counting, 3× MCP23017 (bus 0)
+  RTC, SD, WiFi, scale               bee counting, 3× MCP23017 (I²C)
 ```
 
-The ESP32-C6 has **two independent I²C controllers**, so each role gets its
-own dedicated bus (this is the key change from the original single-bus draft):
+The counter's own I²C bus (`Wire`, GPIO4 SDA / GPIO5 SCL) is used only to reach
+the 3× MCP23017 port expanders.
 
-- **Bus 0 (`Wire`)** — MASTER only, GPIO4 (SDA) / GPIO5 (SCL) → the 3× MCP23017s.
-- **Bus 1 (`Wire1`)** — SLAVE only, GPIO2 (SDA) / GPIO3 (SCL) → the HiveScale link.
-
-Because each role owns its own controller, there is **no master/slave
-time-multiplexing** and the HiveScale can poll at any instant with no risk of a
-bus collision.
+> **The wired HiveScale link is gone.** Earlier revisions ran the C6's second
+> I²C controller as a permanent slave at 0x30, serving a register map to a
+> HiveScale polling over J1 — and the firmware for it has been removed, because
+> HiveHub reads counters over BLE only and dropped its wired client. Sections
+> below still describe the J1 connector and its cable, since both are physically
+> on the PCB; no firmware brings that bus up, so populating them is optional.
 
 ---
 
@@ -72,7 +72,7 @@ bus collision.
 | 7 | 10 kΩ resistor (through-hole) | 5 | MOSFET gate pull-downs (2×), MCP23017 RESET pull-ups (3×) |
 | 8 | 4.7 kΩ resistor (through-hole) | 2 | Bus 0 I²C pull-ups (SDA + SCL to 3.3 V), R4/R5 |
 
-> Bus 1 (the HiveScale link) does **not** need on-board pull-ups — those are
+> J1 (the retired HiveScale link) does **not** need on-board pull-ups — those were
 > provided by the HiveScale-side I²C network.
 
 ### 2.6 Capacitors
@@ -119,9 +119,10 @@ ESP32-C6 GPIO4 (SDA) ——+——————+——————+——— 4.7 
 ESP32-C6 GPIO5 (SCL) ——+——————+——————+——— 4.7 kΩ ——→ 3.3 V
 ```
 
-**Bus 1 (`Wire1`) — HiveScale slave bus.** GPIO2 = SDA, GPIO3 = SCL. Pull-ups
-supplied by the HiveScale side. The C6 listens here as a slave (address 0x30,
-or 0x31 for a second hive — see Section 7).
+**J1 (GPIO2 / GPIO3) — the retired HiveScale slave bus.** The pads and traces
+are on the board, and pull-ups were supplied by the HiveScale side. **No current
+firmware brings this controller up**, so the pins stay inputs and populating J1
+is optional — see the note in Section 1.
 
 > **Note on the schematic net names:** the schematic labels the master bus nets
 > "/SDA" and "/SDC" (a typo for SCL), and the LED-bank nets "/GPIO4" / "/GPIO5".
@@ -190,8 +191,9 @@ Driving the gate HIGH turns that bank's IR emitters ON.
 | Yellow | SDA (GPIO2) |
 | Blue | SCL (GPIO3) |
 
-The C6 acts as an I²C slave (address 0x30) on bus 1. The MCP23017s live on a
-**separate** bus (bus 0) and are never visible to the HiveScale.
+This cable served the retired wired link and is not needed for a BLE counter;
+the board only needs 3.3 V and GND. The MCP23017s live on their own bus and were
+never visible over J1 in any case.
 
 ---
 
@@ -225,7 +227,7 @@ Bottom edge: outer sensors (facing landing board)
 - ESP32-C6 and MCP23017s cluster at the left end of the PCB
 - Sensor pairs run along the full length
 - Q1/Q2 MOSFETs near the sensor zone centre with thermal via to bottom copper pour
-- Keep bus 0 I²C traces short; keep bus 1 (J1) routing away from the MCP bus
+- Keep the MCP I²C traces short; keep the J1 routing away from the MCP bus
 - 100 nF decoupling caps placed directly adjacent to each MCP23017 VDD pin
 
 ---
@@ -297,56 +299,37 @@ Add solar for indefinite runtime.
 
 ---
 
-## 7. I²C Data Handoff Protocol
+## 7. BLE Data Handoff
 
-The bee counter is a **register-based I²C slave** on bus 1. The canonical
-definition lives in `Firmware/include/i2c_slave_protocol.h`; this is a summary.
+The counter is a connectable BLE peripheral. The canonical definition of the
+GATT contract lives in [`docs/ble-mode.md`](docs/ble-mode.md); this is a summary.
 
-- Slave address: **0x30** (hive 1). For a **dual-hive** setup, flash the second
-  unit with `-DBEECOUNTER_I2C_ADDRESS=0x31`.
-- Transaction style: master writes 1 register-pointer byte, then reads N bytes.
-- All multi-byte values are **big-endian on the wire**.
-- `PROTOCOL_VERSION` is currently **2** (v2 added the OTA-over-I²C block).
+- Advertises as `BeeCounter`; HiveHub connects by the MAC paired in its portal.
+- One service, `8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01`, holding a READ
+  measurement characteristic plus three OTA characteristics.
+- The measurement value is built on read, so it is never a stale snapshot:
 
-### Register cheat-sheet
+```json
+{"fw":2,"ver":"0.1.0","uptime_s":1234,"status":15,"num_gates":24,
+ "gates_healthy":3,"total_in":100,"total_out":95,"glitches":2}
+```
 
-| Addr | Width | Name | Meaning |
-|---|---|---|---|
-| 0x00 | 1 | PROTOCOL_VERSION | Currently `2` |
-| 0x01 | 1 | STATUS | Bitfield (`STATUS_*`) |
-| 0x02 | 2 | UPTIME_S | Seconds since boot (clipped at 65535) |
-| 0x04 | 1 | NUM_GATES | Always 24 |
-| 0x05 | 1 | GATES_HEALTHY | 0..3, number of MCPs that ACK'd at boot |
-| 0x10 | 4 | TOTAL_IN | Lifetime inbound bees |
-| 0x14 | 4 | TOTAL_OUT | Lifetime outbound bees |
-| 0x18 | 4 | INTERVAL_IN | Inbound since last LATCH |
-| 0x1C | 4 | INTERVAL_OUT | Outbound since last LATCH |
-| 0x20 | 2 | GLITCH_COUNT | Sensor noise events since boot |
-| 0x22 | 2 | BUSY_RETRIES | Retained for compatibility, always 0 on the dual-bus board |
-| 0x30 | 24 | PER_GATE_IN | Per-gate inbound count since last LATCH |
-| 0x48 | 24 | PER_GATE_OUT | Per-gate outbound count since last LATCH |
-| 0x80 | 1 w-o | CTRL | Write a `CMD_*` (LATCH, CLEAR_TOTALS, LED control…) |
-| 0x90 | w-o | OTA_BEGIN | size(4) + crc32(4) — start OTA-over-I²C |
-| 0x91 | w-o | OTA_DATA | offset(4) + data — stream firmware image |
-| 0x92 | w-o | OTA_END | finalize, verify CRC, reboot |
-| 0x93 | w-o | OTA_ABORT | cancel transfer |
-| 0x94 | 6 r | OTA_STATUS | state(1) + received(4) + err(1) |
+### Totals only
 
-### Typical poll cycle
+`total_in` / `total_out` are monotonic lifetime counters; HiveHub differences
+consecutive reads into per-interval counts on its server. Nothing on the device
+is consumed by being read, so a missed connection cannot lose traffic.
 
-When the HiveScale wakes it: (1) reads STATUS, (2) reads INTERVAL_IN /
-INTERVAL_OUT (and optionally PER_GATE_*), then (3) writes `CTRL = CMD_LATCH`
-to atomically zero the interval counters so the next interval starts clean.
-**Only send `CMD_LATCH` after every read succeeded**, otherwise the interval's
-data is lost. The HiveScale then combines the counts with its weight + RTC
-timestamp and logs a record.
+This replaced a register map with interval counters that a `CMD_LATCH` command
+zeroed — where a HiveScale that read but failed to latch, or latched but failed
+to read, silently lost an interval.
 
-### OTA-over-I²C
+### OTA over BLE
 
-The HiveScale can relay a new C6 firmware image (downloaded over WiFi) to the
-bee counter via the `REG_OTA_*` registers: BEGIN (size + CRC32) → repeated
-DATA frames → END (verify + reboot). Gate counting pauses for the duration of
-the transfer. See `i2c_slave_protocol.h` and `Firmware/README.md`.
+HiveHub relays a new C6 image (downloaded over WiFi) into the counter's OTA
+characteristics: BEGIN (size + CRC-32) → DATA frames → END (verify, swap slots,
+reboot). Gate counting pauses for the duration. See
+[`docs/ble-mode.md`](docs/ble-mode.md).
 
 ---
 
@@ -356,21 +339,23 @@ Implemented in `Firmware/` (PlatformIO, `esp32-c6-devkitc-1` env). See
 `Firmware/README.md` for build/flash and tuning details.
 
 ### ESP32-C6 (bee counter)
-- **Bus 0 (`Wire`, master):** continuously polls the 3× MCP23017 (~5 ms loop),
+- **`Wire` (master):** continuously polls the 3× MCP23017 (~5 ms loop),
   reading all 16 inputs per chip via `readGPIOAB()`.
-- **Bus 1 (`Wire1`, slave, 0x30):** answers HiveScale register reads/writes via
-  `onReceive`/`onRequest` callbacks — no time-multiplexing, no slave window.
+- **BLE/GATT peripheral:** serves lifetime totals as JSON on read, and accepts a
+  firmware image on the OTA characteristics (`src/ble_link.cpp`).
 - Per-gate debounce + direction state machine (IDLE → INNER/OUTER_FIRST →
   PAIRED) emits IN/OUT counts; glitches tallied for diagnostics.
-- IR banks driven on GPIO8 (bank 1) / GPIO9 (bank 2); LED mode controllable
-  over I²C.
-- OTA-over-I²C image receiver (`Update` library) with CRC32 verification.
+- IR banks driven on GPIO8 (bank 1) / GPIO9 (bank 2); LED mode settable from the
+  IR_DEBUG serial console.
+- BLE OTA image receiver (`Update` library) with size + CRC-32 verification
+  before the inactive app slot is selected.
 
-### HiveScale ESP32 (data aggregator — lives in the HiveScale firmware, not here)
-- On wake: read RTC timestamp, read weight (HX711), poll bee counts from the C6.
-- Send `CMD_LATCH` after a successful read.
+### HiveHub ESP32 (data aggregator — lives in the HiveHub firmware, not here)
+- On wake: read RTC timestamp, read weight, connect to the counter over BLE and
+  read its lifetime totals.
+- Difference consecutive totals server-side to get the interval counts.
 - Write combined record to SD card; transmit via WiFi if available.
-- Optionally relay a firmware update to the C6 over OTA-over-I²C.
+- Optionally relay a firmware update to the C6 over BLE (`update_beecounter`).
 - Sleep ~10 minutes.
 
 ---
