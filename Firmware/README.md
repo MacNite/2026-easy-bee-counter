@@ -4,6 +4,16 @@ Firmware for the ESP32-C6 mini bee counter PCB. Continuously polls the 24
 entrance gates, detects directional bee crossings, and serves the results to
 the HiveScale main board over a dedicated I2C link.
 
+For current MacNite/HiveHub installations, use the wireless
+`esp32-c6-devkitc-1-ble` environment instead: HiveHub supports HiveTraffic as a
+BLE/GATT totals-only sensor and no longer supports the wired counter link. See
+[`docs/ble-mode.md`](../docs/ble-mode.md).
+
+The wireless image also exposes HiveInside-style connectable BLE OTA
+characteristics. Image size and CRC-32 are verified before the inactive app
+slot is selected; see the BLE-mode documentation for framing and the remaining
+HiveHub relay work.
+
 > **2026 dual-I2C revision:** this firmware uses **both** of the ESP32-C6's
 > independent I2C controllers — one permanently MASTER for the on-board
 > MCP23017s, one permanently SLAVE for the HiveScale. The old single-bus
@@ -242,7 +252,7 @@ All the knobs are at the top of `src/main.cpp`:
 | `SENSOR_DEBOUNCE_MS`      | 3       | Minimum stable time before a sensor state change counts       |
 | `GATE_PAIRING_WINDOW_MS`  | 2000    | Max time between inner/outer trip for a directional count     |
 | `SENSOR_STUCK_MS`         | 30000   | After this many ms continuously blocked, fault flag is raised |
-| `I2C_MASTER_HZ`           | 100000  | Bus 0 (MCP) clock. 400 kHz is the MCP spec limit; 100 kHz is the safe default |
+| `I2C_MASTER_HZ`           | 400000  | Bus 0 (MCP) clock; reduces every pulsed sample's IR-on and CPU-wait time |
 | `I2C_SLAVE_HZ`            | 100000  | Bus 1 controller rate (as a slave, the C6 follows the master's clock) |
 | `LED_SETTLE_US`           | 250     | IR emitter settle time before each pulsed read. Lower = less power but risks reading stale "clear" levels if shorter than the real phototransistor settle time. |
 

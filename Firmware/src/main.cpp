@@ -88,17 +88,11 @@ static constexpr uint32_t GATE_PAIRING_WINDOW_MS = 2000;
 // sensor-fault status bit. A bee cannot physically block a beam for 30 s.
 static constexpr uint32_t SENSOR_STUCK_MS = 30000;
 
-// I2C bus speed for the master (MCP) bus. 400 kHz is the MCP23017 spec limit;
-// 100 kHz is safer over long cabling. The on-board MCP traces are short, but
-// 100 kHz is left as the conservative default.
-//
-// NOTE on pulsed LEDs: the emitters stay lit for the whole three-chip read, so
-// the emitter ON-time (and therefore the duty cycle / average current) scales
-// with the read time. At 100 kHz the read is ~1.5 ms; bumping this to 400000
-// shortens it to ~0.4 ms and cuts emitter duty roughly 3-4x with no loss of
-// detection quality on the short on-board traces. Worth doing if you want lower
-// power without touching POLL_INTERVAL_MS.
-static constexpr uint32_t I2C_MASTER_HZ = 100000;
+// Run the short, on-board MCP23017 bus at its 400 kHz fast-mode limit. The IR
+// emitters stay lit for the complete three-chip read, so this reduces their
+// on-time and CPU blocking roughly 3-4x versus the former 100 kHz default. Fall
+// back to 100 kHz if an assembled board cannot meet fast-mode signal integrity.
+static constexpr uint32_t I2C_MASTER_HZ = 400000;
 
 // I2C clock for the HiveScale slave bus. As a slave the C6 follows the
 // master's clock; this value is only the controller's configured rate.
@@ -636,14 +630,12 @@ static void irDebugPoll() {
 #endif  // IR_DEBUG
 
 // ============================================================================
-// Shared control-command handling (REG_CTRL / BLE CTRL characteristic)
+// Wired control-command handling (REG_CTRL)
 // ============================================================================
 //
-// One implementation for the CMD_* opcodes, called from BOTH the I2C slave
-// receive callback and the BLE control characteristic, so the two transports
-// stay byte-for-byte equivalent. CMD_LATCH copies the live counters into the
-// readout shadow inside a noInterrupts() block; the others toggle totals /
-// faults / LED mode.
+// Wired I2C command handling. The HiveHub BLE contract is intentionally
+// read-only and totals-only, so this is compiled out of the wireless image.
+#ifndef BEECOUNTER_BLE
 static void applyCtrlCommand(uint8_t cmd) {
     switch (cmd) {
     case beecounter_proto::CMD_LATCH:
@@ -673,6 +665,7 @@ static void applyCtrlCommand(uint8_t cmd) {
     default: break;
     }
 }
+#endif
 
 #ifdef BEECOUNTER_BLE
 // ----------------------------------------------------------------------------
@@ -680,10 +673,6 @@ static void applyCtrlCommand(uint8_t cmd) {
 // translation unit). ble_link.cpp drives the GATT server and calls into these.
 // ----------------------------------------------------------------------------
 namespace ble {
-
-void applyCtrl(uint8_t cmd) {
-    applyCtrlCommand(cmd);
-}
 
 void getTelemetry(Telemetry& t) {
     uint32_t up = millis() / 1000;
@@ -697,8 +686,6 @@ void getTelemetry(Telemetry& t) {
                                    (g_mcp_u4_ok ? 1 : 0));
     t.total_in         = g_total_in;
     t.total_out        = g_total_out;
-    t.interval_in      = g_interval_in_shadow;
-    t.interval_out     = g_interval_out_shadow;
     t.glitch_count     = g_glitch_count;
 }
 
@@ -963,7 +950,9 @@ void setup() {
 }
 
 void loop() {
-#ifndef BEECOUNTER_BLE
+#ifdef BEECOUNTER_BLE
+    ble::loopOta();
+#else
     // Deferred reboot: the HiveScale has had a chance to read OTA_STATE_DONE
     // from REG_OTA_STATUS, so it's safe to restart into the new firmware.
     if (g_ota_reboot) {
@@ -971,10 +960,6 @@ void loop() {
         delay(50);            // let any in-flight I2C ack settle
         ESP.restart();
     }
-#else
-    // BLE build: the firmware-over-BLE state machine lives in ble_link.cpp;
-    // pump its deferred reboot once verified.
-    ble::loopOta();
 #endif
 
     const uint32_t now = millis();
@@ -987,10 +972,8 @@ void loop() {
     // ---- Master work: poll the MCP23017s every POLL_INTERVAL_MS ----
     // The HiveScale slave bus (Wire1) is serviced asynchronously by its
     // onReceive/onRequest callbacks, so the loop body only does master work.
-    // While an OTA transfer is in progress we skip polling so the CPU is
-    // dedicated to servicing inbound firmware frames; bee counts during the
-    // ~20 s update are intentionally sacrificed. We also force the emitters
-    // dark for the duration so they aren't left lit by a mid-pulse abort.
+    // Both OTA transports pause sensing so flash writes and BLE/I2C callbacks
+    // cannot leave an emitter pulse active or corrupt a crossing in progress.
 #ifdef BEECOUNTER_BLE
     const bool ota_busy = ble::isOtaActive();
 #else
@@ -1011,19 +994,6 @@ void loop() {
         last_led_mode = g_led_mode;
         setIrLeds(true);   // setIrLeds() applies the mode-correct steady level
     }
-
-#ifdef BEECOUNTER_BLE
-    // Refresh the BLE measurement characteristic periodically so a connected
-    // central that subscribes to notifications sees live totals, and an
-    // on-demand read always returns fresh values. Control writes (e.g. LATCH)
-    // re-publish immediately from the CTRL callback, so this is just a
-    // heartbeat — 2 s is plenty given the ~10-minute upload cadence.
-    static uint32_t last_ble_publish_ms = 0;
-    if (now - last_ble_publish_ms >= 2000) {
-        last_ble_publish_ms = now;
-        ble::publish();
-    }
-#endif
 
     // Periodic debug dump on serial -- once every 30 s.
     static uint32_t last_dump_ms = 0;
