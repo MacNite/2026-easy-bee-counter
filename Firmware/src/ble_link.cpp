@@ -213,30 +213,43 @@ class ServerCallbacks : public NimBLEServerCallbacks {
     }
 };
 
+// NimBLE stores these pointers for the lifetime of the server and never frees
+// them: NimBLECharacteristic::setCallbacks() takes no ownership at all, so the
+// old `new X(), true` form both fails to compile against NimBLE 2.5.x (the
+// deleteCallbacks argument is gone) and would have leaked. File-scope
+// singletons outlive the server by construction — they are stateless anyway.
+MeasurementCallbacks measurementCallbacks;
+OtaControlCallbacks otaControlCallbacks;
+OtaDataCallbacks otaDataCallbacks;
+ServerCallbacks serverCallbacks;
+
 }  // namespace
 
 void begin() {
     NimBLEDevice::init(BLE_DEVICE_NAME);
     NimBLEServer* server = NimBLEDevice::createServer();
-    server->setCallbacks(new ServerCallbacks(), true);
+    // false: never delete a statically allocated callback object.
+    server->setCallbacks(&serverCallbacks, false);
     server->advertiseOnDisconnect(true);
 
     NimBLEService* service = server->createService(SVC_BEECOUNTER);
     NimBLECharacteristic* measurement = service->createCharacteristic(
         CHR_MEASUREMENT, NIMBLE_PROPERTY::READ);
-    measurement->setCallbacks(new MeasurementCallbacks(), true);
+    measurement->setCallbacks(&measurementCallbacks);
     refreshMeasurement(measurement);
 
     NimBLECharacteristic* control = service->createCharacteristic(
         CHR_OTA_CTRL, NIMBLE_PROPERTY::WRITE);
-    control->setCallbacks(new OtaControlCallbacks(), true);
+    control->setCallbacks(&otaControlCallbacks);
     NimBLECharacteristic* payload = service->createCharacteristic(
         CHR_OTA_DATA, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
-    payload->setCallbacks(new OtaDataCallbacks(), true);
+    payload->setCallbacks(&otaDataCallbacks);
     otaStatus = service->createCharacteristic(
         CHR_OTA_STATUS, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
     publishOtaStatus();
-    service->start();
+    // No service->start(): in NimBLE 2.5.x it is a deprecated no-op. Services
+    // are registered when the GATT server starts, which advertising->start()
+    // below does for us.
 
     NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
     // The name goes in the SCAN RESPONSE, not the advertisement. A legacy
