@@ -25,7 +25,7 @@ combining the counts with weight/timestamp data before logging and transmitting.
   RTC, SD, WiFi, scale               bee counting, 3× MCP23017 (I²C)
 ```
 
-The counter's own I²C bus (`Wire`, GPIO4 SDA / GPIO5 SCL) is used only to reach
+The counter's own I²C bus (`Wire`, silk D4 = GPIO22 SDA / silk D5 = GPIO23 SCL) is used only to reach
 the 3× MCP23017 port expanders.
 
 > **The wired HiveScale link is gone.** Earlier revisions ran the C6's second
@@ -43,7 +43,7 @@ the 3× MCP23017 port expanders.
 
 | # | Component | Qty | Notes |
 |---|-----------|-----|-------|
-| 1 | ESP32-C6-MINI-1 module | 1 | Always-on bee counter MCU. ~15 mA active, 3.3 V logic, USB. Two hardware I²C controllers |
+| 1 | Seeed XIAO ESP32C6 (Seeed 113991054) | 1 | Always-on bee counter MCU. ~15 mA active, 3.3 V logic, USB-C. Two hardware I²C controllers. **Silk D0..D10 ≠ GPIO numbers** — see `Firmware/include/pins.h` |
 
 ### 2.2 I/O Expansion (replaces all 6× 74HC165)
 
@@ -107,27 +107,29 @@ the 3× MCP23017 port expanders.
 
 This board uses **two separate I²C buses**, one per controller:
 
-**Bus 0 (`Wire`) — MCP23017 master bus.** GPIO4 = SDA, GPIO5 = SCL. On-board
+**Bus 0 (`Wire`) — MCP23017 master bus.** Silk D4 = GPIO22 = SDA, silk D5 = GPIO23 = SCL. On-board
 4.7 kΩ pull-ups (R4/R5) to 3.3 V.
 
 ```
-ESP32-C6 GPIO4 (SDA) ——+——————+——————+——— 4.7 kΩ ——→ 3.3 V
+XIAO D4 = GPIO22 (SDA) ——+——————+——————+——— 4.7 kΩ ——→ 3.3 V
                         |      |      |
                       MCP1   MCP2   MCP3
                       0x20   0x21   0x22
 
-ESP32-C6 GPIO5 (SCL) ——+——————+——————+——— 4.7 kΩ ——→ 3.3 V
+XIAO D5 = GPIO23 (SCL) ——+——————+——————+——— 4.7 kΩ ——→ 3.3 V
 ```
 
-**J1 (GPIO2 / GPIO3) — the retired HiveScale slave bus.** The pads and traces
+**J1 (silk D2 / D3 = GPIO2 / GPIO21) — the retired HiveScale slave bus.** The pads and traces
 are on the board, and pull-ups were supplied by the HiveScale side. **No current
 firmware brings this controller up**, so the pins stay inputs and populating J1
 is optional — see the note in Section 1.
 
 > **Note on the schematic net names:** the schematic labels the master bus nets
 > "/SDA" and "/SDC" (a typo for SCL), and the LED-bank nets "/GPIO4" / "/GPIO5".
-> Those are just net *names* — physically the LED banks are driven from GPIO8
-> and GPIO9. See `Firmware/include/pins.h` for the authoritative map.
+> Those are just net *names* — physically the LED banks are driven from silk
+> D8 = GPIO19 and silk D9 = GPIO20. U5 is a Seeed XIAO ESP32C6, whose silk
+> numbers are **not** its GPIO numbers; see `Firmware/include/pins.h` for the
+> authoritative map.
 
 ### 3.2 MCP23017 Wiring (repeat for each of the 3 chips, all on bus 0)
 
@@ -135,8 +137,8 @@ is optional — see the note in Section 1.
 |---|---|---|
 | 9 (VDD) | 3.3 V | Add 100 nF ceramic cap to GND nearby |
 | 10 (VSS) | GND | |
-| 12 (SCL) | Bus 0 SCL (GPIO5) | |
-| 13 (SDA) | Bus 0 SDA (GPIO4) | |
+| 12 (SCL) | Bus 0 SCL (silk D5 = GPIO23) | |
+| 13 (SDA) | Bus 0 SDA (silk D4 = GPIO22) | |
 | 15 (A0) | GND / 3.3 V | Address bit 0 (see table below) |
 | 16 (A1) | GND / 3.3 V | Address bit 1 |
 | 17 (A2) | GND / 3.3 V | Address bit 2 |
@@ -174,7 +176,7 @@ Logical convention in firmware: **sensor reads LOW = beam reflected/blocked
 
 | IRLB8721 Pin | Connection |
 |---|---|
-| Gate (pin 1) | ESP32-C6 **GPIO8** (Q1 = bank 1, gates 00..13) or **GPIO9** (Q2 = bank 2, gates 14..27) + 10 kΩ pull-down to GND |
+| Gate (pin 1) | XIAO **D8 = GPIO19** (Q1 = bank 1, gates 00..13) or **D9 = GPIO20** (Q2 = bank 2, gates 14..27) + 10 kΩ pull-down to GND |
 | Drain (pin 2) | IR LED cathode strings for that bank |
 | Source (pin 3) | GND |
 
@@ -188,8 +190,8 @@ Driving the gate HIGH turns that bank's IR emitters ON.
 |---|---|
 | Red | 3.3 V (from HiveScale to power the C6 + MCP23017s) |
 | Black | GND |
-| Yellow | SDA (GPIO2) |
-| Blue | SCL (GPIO3) |
+| Yellow | SDA (silk D2 = GPIO2) |
+| Blue | SCL (silk D3 = GPIO21) |
 
 This cable served the retired wired link and is not needed for a BLE counter;
 the board only needs 3.3 V and GND. The MCP23017s live on their own bus and were
@@ -345,7 +347,7 @@ Implemented in `Firmware/` (PlatformIO, `esp32-c6-devkitc-1` env). See
   firmware image on the OTA characteristics (`src/ble_link.cpp`).
 - Per-gate debounce + direction state machine (IDLE → INNER/OUTER_FIRST →
   PAIRED) emits IN/OUT counts; glitches tallied for diagnostics.
-- IR banks driven on GPIO8 (bank 1) / GPIO9 (bank 2); LED mode settable from the
+- IR banks driven on GPIO19 / silk D8 (bank 1) and GPIO20 / silk D9 (bank 2); LED mode settable from the
   IR_DEBUG serial console.
 - BLE OTA image receiver (`Update` library) with size + CRC-32 verification
   before the inactive app slot is selected.
