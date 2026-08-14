@@ -47,12 +47,19 @@ The 48 sensor lines are read through 3 MCP23017 I2C port expanders:
 | U3    | 0x21     | GATE_10..17 | GPA0..GPA7     | GPB0..GPB7     |
 | U4    | 0x22     | GATE_20..27 | GPA0..GPA7     | GPB0..GPB7     |
 
-The IR emitters are split into two banks driven by IRLB8721 N-channel MOSFETs:
+The IR emitters are split into three banks driven by IRLB8721 N-channel MOSFETs — one FET per MCP23017 since the 2026-08 hardware revision:
 
-- **LED_BANK_1** — gates 00..13, FET driven by GPIO19 (XIAO silk "D8")
-- **LED_BANK_2** — gates 14..27, FET driven by GPIO20 (XIAO silk "D9")
+| Bank | Gates | FET | Enable GPIO | XIAO silk | Schematic net |
+| ---- | ----- | --- | ----------- | --------- | ------------- |
+| LED_BANK_1 | GATE_00..07 (U2) | Q1 | GPIO19 | D8  | /GPIO4 |
+| LED_BANK_2 | GATE_10..17 (U3) | Q2 | GPIO20 | D9  | /GPIO5 |
+| LED_BANK_3 | GATE_20..27 (U4) | Q3 | GPIO18 | D10 | /GPIO6 |
 
-Driving the GPIO HIGH turns the bank's emitters on. In the default `LedMode::AUTO` the emitters are **pulsed**: both banks are lit only for the settle + MCP-read window of each poll (~1.75 ms at 100 kHz), then switched off until the next poll. This drops the emitter duty cycle from 100% to roughly 35% at  the default 5 ms poll interval, cutting average emitter current proportionally, with no change to detection behaviour. The IR_DEBUG console's `1` / `0` / `a` keys force steady-on, blackout and pulsed mode respectively for bench work.
+The net names `/GPIO4`, `/GPIO5` and `/GPIO6` are labels only — they are **not** physical GPIO4/5/6. Use the Enable GPIO column.
+
+The previous 2-FET build split U3's gates across banks 1 and 2 (00..13 / 14..27); banks now line up 1:1 with the expanders. `pins::IR_LED_BANK_EN[]` maps bank number − 1 to its GPIO, and `gates::TABLE[i].led_bank` gives each gate's bank.
+
+Driving the GPIO HIGH turns the bank's emitters on. In the default `LedMode::AUTO` the emitters are **pulsed**: all three banks are lit together only for the settle + MCP-read window of each poll (~1.75 ms at 100 kHz), then switched off until the next poll. This drops the emitter duty cycle from 100% to roughly 35% at  the default 5 ms poll interval, cutting average emitter current proportionally, with no change to detection behaviour. The IR_DEBUG console's `1` / `0` / `a` keys force steady-on, blackout and pulsed mode respectively for bench work.
 
 ### Counting
 

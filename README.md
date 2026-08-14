@@ -61,7 +61,7 @@ the 3× MCP23017 port expanders.
 
 | # | Component | Qty | Notes |
 |---|-----------|-----|-------|
-| 4 | IRLB8721PbF N-channel MOSFET (TO-220) | 2 | 3.3 V gate-safe. Q1 controls LED_BANK_1 (gates 00..13), Q2 controls LED_BANK_2 (gates 14..27) |
+| 4 | IRLB8721PbF N-channel MOSFET (TO-220) | 3 | 3.3 V gate-safe. One per MCP23017: Q1 = LED_BANK_1 (gates 00..07), Q2 = LED_BANK_2 (gates 10..17), Q3 = LED_BANK_3 (gates 20..27) |
 
 ### 2.5 Resistors
 
@@ -69,7 +69,7 @@ the 3× MCP23017 port expanders.
 |---|-----------|-----|-------|
 | 5 | 22 Ω bussed SIP resistor (9-pin, 8R) | 3 | IR LED current limiting (2 LEDs in series per gate) |
 | 6 | 100 kΩ bussed SIP resistor (9-pin, 8R) | 6 | Sensor pull-up resistors (1 per MCP23017 input, to +3.3 V) |
-| 7 | 10 kΩ resistor (through-hole) | 5 | MOSFET gate pull-downs (2×), MCP23017 RESET pull-ups (3×) |
+| 7 | 10 kΩ resistor (through-hole) | 6 | MOSFET gate pull-downs (3×), MCP23017 RESET pull-ups (3×) |
 | 8 | 4.7 kΩ resistor (through-hole) | 2 | Bus 0 I²C pull-ups (SDA + SCL to 3.3 V), R4/R5 |
 
 > J1 (the retired HiveScale link) does **not** need on-board pull-ups — those were
@@ -125,9 +125,9 @@ firmware brings this controller up**, so the pins stay inputs and populating J1
 is optional — see the note in Section 1.
 
 > **Note on the schematic net names:** the schematic labels the master bus nets
-> "/SDA" and "/SDC" (a typo for SCL), and the LED-bank nets "/GPIO4" / "/GPIO5".
-> Those are just net *names* — physically the LED banks are driven from silk
-> D8 = GPIO19 and silk D9 = GPIO20. U5 is a Seeed XIAO ESP32C6, whose silk
+> "/SDA" and "/SDC" (a typo for SCL), and the LED-bank nets "/GPIO4" / "/GPIO5"
+> / "/GPIO6". Those are just net *names* — physically the LED banks are driven
+> from silk D8 = GPIO19, D9 = GPIO20 and D10 = GPIO18. U5 is a Seeed XIAO ESP32C6, whose silk
 > numbers are **not** its GPIO numbers; see `Firmware/include/pins.h` for the
 > authoritative map.
 
@@ -172,13 +172,19 @@ QRE1113 pin 4 (Emitter)        ——→ GND
 Logical convention in firmware: **sensor reads LOW = beam reflected/blocked
 (bee in beam); HIGH = clear or LEDs off.**
 
-### 3.4 MOSFET Wiring (IRLB8721PbF, 2× identical)
+### 3.4 MOSFET Wiring (IRLB8721PbF, 3× identical — one per MCP23017)
 
 | IRLB8721 Pin | Connection |
 |---|---|
-| Gate (pin 1) | XIAO **D8 = GPIO19** (Q1 = bank 1, gates 00..13) or **D9 = GPIO20** (Q2 = bank 2, gates 14..27) + 10 kΩ pull-down to GND |
+| Gate (pin 1) | Bank enable GPIO from the table below, + 10 kΩ pull-down to GND |
 | Drain (pin 2) | IR LED cathode strings for that bank |
 | Source (pin 3) | GND |
+
+| FET | Bank | Gates | XIAO silk | GPIO | Schematic net |
+|---|---|---|---|---|---|
+| Q1 | LED_BANK_1 | 00..07 (U2 @ 0x20) | D8  | GPIO19 | /GPIO4 |
+| Q2 | LED_BANK_2 | 10..17 (U3 @ 0x21) | D9  | GPIO20 | /GPIO5 |
+| Q3 | LED_BANK_3 | 20..27 (U4 @ 0x22) | D10 | GPIO18 | /GPIO6 |
 
 Driving the gate HIGH turns that bank's IR emitters ON.
 
@@ -288,7 +294,7 @@ Sensors face upward from the bottom PCB into the channel. The black baffle absor
 |---|---|---|---|
 | ESP32-C6 mini (active, no WiFi) | 15 mA | 1 | 15 mA |
 | MCP23017 (active) | 1 mA | 3 | 3 mA |
-| IR LEDs (driven continuously while counting) | ~bank current | 2 banks | budget per LED string |
+| IR LEDs (pulsed while counting) | ~bank current | 3 banks | budget per LED string |
 | Quiescent leakage | — | — | ~1 mA |
 | **Bee counter total** | | | **~20 mA + LED draw** |
 | HiveScale ESP32 (sleep) | ~0.05 mA | 1 | 0.05 mA |
@@ -347,8 +353,9 @@ Implemented in `Firmware/` (PlatformIO, `esp32-c6-devkitc-1` env). See
   firmware image on the OTA characteristics (`src/ble_link.cpp`).
 - Per-gate debounce + direction state machine (IDLE → INNER/OUTER_FIRST →
   PAIRED) emits IN/OUT counts; glitches tallied for diagnostics.
-- IR banks driven on GPIO19 / silk D8 (bank 1) and GPIO20 / silk D9 (bank 2); LED mode settable from the
-  IR_DEBUG serial console.
+- IR banks driven on GPIO19 / silk D8 (bank 1), GPIO20 / silk D9 (bank 2) and
+  GPIO18 / silk D10 (bank 3) — one MOSFET per MCP23017; LED mode settable from
+  the IR_DEBUG serial console.
 - BLE OTA image receiver (`Update` library) with size + CRC-32 verification
   before the inactive app slot is selected.
 

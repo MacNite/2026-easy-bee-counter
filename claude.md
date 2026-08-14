@@ -75,8 +75,12 @@ backend.
   its traces are still physically on the PCB, but no firmware brings that
   controller up. Don't reintroduce it.
 - **`pins.h` beats the schematic.** The schematic's net names are misleading —
-  `/SDC` is a typo for SCL, and the `/GPIO4` / `/GPIO5` LED-bank nets are just
-  names; the banks are physically driven from GPIO8 and GPIO9.
+  `/SDC` is a typo for SCL, and the `/GPIO4` / `/GPIO5` / `/GPIO6` LED-bank nets
+  are just names; the three banks are physically driven from GPIO19, GPIO20 and
+  GPIO18 (XIAO silk D8, D9, D10).
+- **Three IR emitter banks, one MOSFET per MCP23017** since the 2026-08 hardware
+  revision: bank 1 = gates 00..07 (U2), bank 2 = 10..17 (U3), bank 3 = 20..27
+  (U4). Older docs describing a 2-FET split (00..13 / 14..27) are stale.
 - OTA needs the dual-slot `partitions_4mb_ota_no_fs.csv` layout. A board still
   running a single-app image has to be updated once over USB.
 
