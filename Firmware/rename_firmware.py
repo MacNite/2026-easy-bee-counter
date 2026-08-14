@@ -5,7 +5,6 @@ for the image version — ``HIVETRAFFIC_FW_VERSION`` in ``include/version.h`` �
 and combines it with the board label and the build variant, producing
 
     hivetraffic_esp32-c6_<version>.bin           (production)
-    hivetraffic_esp32-c6_<version>-irdebug.bin   (IR debug console build)
 
 That name is what makes an image self-describing to HiveHub. Its firmware
 upload form parses the filename and pre-fills the release for you:
@@ -23,10 +22,10 @@ HiveHub's ``rename_firmware.py`` (BOARD_LABELS), ``server/firmware.py``
 (``board_from_filename``, ``BEECOUNTER_BOARDS``) and the dashboard's
 ``versionFromFilename`` / ``targetFromFilename``.
 
-The debug variant is stamped *after* the version rather than into the board
-label on purpose. It keeps the board token exactly ``esp32-c6`` (so the name
+Any future variant is stamped *after* the version rather than into the board
+label on purpose. That keeps the board token exactly ``esp32-c6`` (so the name
 still parses), it is what the operator sees in the pre-filled Version field —
-"0.1.0-irdebug" is hard to publish by accident — and HiveHub compares versions
+"0.1.0-something" is hard to publish by accident — and HiveHub compares versions
 component-wise with non-digits stripped, so such a build never out-ranks the
 production image of the same version and cannot be relayed over one.
 
@@ -38,9 +37,9 @@ import re
 
 Import("env")  # noqa: F821 - provided by PlatformIO
 
-# The counter is a single-board product (Seeed XIAO ESP32C6, built against the
-# esp32-c6-devkitc-1 variant), so every environment carries the same board
-# label; the environments differ only in the variant suffix below.
+# The counter is a single-board product (Seeed XIAO ESP32C6, PlatformIO board
+# seeed_xiao_esp32c6), so every environment carries the same board label; the
+# environments differ only in the variant suffix below.
 BOARD_LABEL = "esp32-c6"
 
 # Suffix appended after the version, per PlatformIO env name. The production
@@ -48,8 +47,7 @@ BOARD_LABEL = "esp32-c6"
 # environment is still named distinctly instead of silently overwriting the
 # production artifact.
 VARIANT_SUFFIXES = {
-    "esp32-c6-devkitc-1": "",
-    "esp32-c6-devkitc-1-irdebug": "-irdebug",
+    "seeed_xiao_esp32c6": "",
 }
 
 

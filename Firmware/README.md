@@ -106,18 +106,21 @@ pio run -t upload     # flash via USB
 pio device monitor    # 115200 baud serial output
 ```
 
-PlatformIO target is `esp32-c6-devkitc-1`. U5 on this PCB is a **Seeed XIAO
-ESP32C6** (Seeed part 113991054), not a bare ESP32-C6-MINI-1; the devkit profile
-is used because the firmware names every pin by raw GPIO number in `pins.h`
-rather than by the XIAO's `D0..D10` aliases. Do not read the board's silk
-numbers as GPIO numbers — they differ (silk D4 is GPIO22). USB CDC is enabled in
-`platformio.ini`, so `Serial` output comes out over USB without an external UART
-bridge.
+PlatformIO target is `seeed_xiao_esp32c6`. U5 on this PCB is a **Seeed XIAO
+ESP32C6** (Seeed part 113991054), not a bare ESP32-C6-MINI-1, so this is the
+board profile that matches the hardware: it declares the module's 4 MB flash
+(the earlier `esp32-c6-devkitc-1` profile declared 8 MB) and pulls in the
+`XIAO_ESP32C6` variant. That variant defines the `D0..D10` aliases but does
+*not* enable Arduino pin remapping, so the raw GPIO numbers in `pins.h` are
+still correct as written. Do not read the board's silk numbers as GPIO numbers —
+they differ (silk D4 is GPIO22). USB CDC is enabled in `platformio.ini`, so
+`Serial` output comes out over USB without an external UART bridge.
 
 The build uses `partitions_4mb_ota_no_fs.csv` — two 2 MB app slots so BLE OTA
-can write the inactive one. A counter still running a pre-BLE image was flashed
-with a single-app layout and **must be updated once over USB**; OTA cannot
-migrate a partition table.
+can write the inactive one. The table sums to exactly 4 MB, which is the flash
+the XIAO board profile declares. A counter still running a pre-BLE image was
+flashed with a single-app layout and **must be updated once over USB**; OTA
+cannot migrate a partition table.
 
 ### Build artifacts
 
@@ -125,10 +128,9 @@ migrate a partition table.
 names the products after the board and the version from `include/version.h`
 instead of the generic `firmware.bin`:
 
-| Environment                  | Artifact in `.pio/build/<env>/`           |
-| ---------------------------- | ----------------------------------------- |
-| `esp32-c6-devkitc-1`         | `hivetraffic_esp32-c6_<version>.bin`      |
-| `esp32-c6-devkitc-1-irdebug` | `hivetraffic_esp32-c6_<version>-irdebug.bin` |
+| Environment          | Artifact in `.pio/build/<env>/`      |
+| -------------------- | ------------------------------------ |
+| `seeed_xiao_esp32c6` | `hivetraffic_esp32-c6_<version>.bin` |
 
 That name is what makes an image self-describing to HiveHub. Drop the `.bin`
 into the dashboard's **Upload firmware** form and it reads the filename to
@@ -144,26 +146,30 @@ to stay in sync with HiveHub's `rename_firmware.py`, `server/firmware.py`
 (`board_from_filename`, `BEECOUNTER_BOARDS`) and the dashboard's filename
 parsing. The header comment in `rename_firmware.py` lists them.
 
-The debug variant is stamped after the version rather than into the board token
-on purpose: `0.1.0-irdebug` is what shows up in the pre-filled Version field, so
-it is hard to publish by mistake, and HiveHub compares versions component-wise
-with non-digits stripped — such a build ties with the production image of the
-same version and can never be relayed over it.
+Should a variant build ever be needed again, stamp it after the version rather
+than into the board token: `0.1.0-something` is what shows up in the pre-filled
+Version field, so it is hard to publish by mistake, and HiveHub compares
+versions component-wise with non-digits stripped — such a build ties with the
+production image of the same version and can never be relayed over it.
+`rename_firmware.py` already falls back to `-<env name>` for any environment it
+does not know.
 
 ---
 
 ## USB IR-sensor debug console (bench bring-up)
 
 For initial testing of the IR sensors over USB — with no HiveScale / I2C master
-attached — flash the dedicated debug environment instead of the production one:
+attached — there is an interactive serial console in `main.cpp`. It has no
+environment of its own; compile it into the production build on demand:
 
 ```bash
-pio run -e esp32-c6-devkitc-1-irdebug -t upload
+PLATFORMIO_BUILD_FLAGS=-DIR_DEBUG pio run -t upload
 pio device monitor    # 115200 baud
 ```
 
-This build is identical to production but compiles in an interactive serial
-console (gated behind `-DIR_DEBUG`, so it is **never** in the normal firmware).
+That build is identical to production but compiles in the console (gated behind
+`-DIR_DEBUG`, so it is **never** in the normal firmware). Note that the artifact
+keeps the production filename, so do not upload one of these to HiveHub.
 Press a single key in the serial monitor:
 
 | Key | Action                                                            |
