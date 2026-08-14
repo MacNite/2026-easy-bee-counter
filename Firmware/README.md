@@ -112,6 +112,37 @@ can write the inactive one. A counter still running a pre-BLE image was flashed
 with a single-app layout and **must be updated once over USB**; OTA cannot
 migrate a partition table.
 
+### Build artifacts
+
+[`rename_firmware.py`](rename_firmware.py) (wired in as a `pre:` extra script)
+names the products after the board and the version from `include/version.h`
+instead of the generic `firmware.bin`:
+
+| Environment                  | Artifact in `.pio/build/<env>/`           |
+| ---------------------------- | ----------------------------------------- |
+| `esp32-c6-devkitc-1`         | `hivetraffic_esp32-c6_<version>.bin`      |
+| `esp32-c6-devkitc-1-irdebug` | `hivetraffic_esp32-c6_<version>-irdebug.bin` |
+
+That name is what makes an image self-describing to HiveHub. Drop the `.bin`
+into the dashboard's **Upload firmware** form and it reads the filename to
+pre-select target *HiveTraffic counter* and pre-fill the Version field — the
+board is fixed at `esp32-c6`, and the backend refuses to publish a release whose
+board disagrees with its filename, so a cross-architecture image can never be
+relayed to a counter. Upload this file **as-is**: it is the application-only
+image, which is what the counter's OTA writes into its inactive app slot, not a
+merged factory image.
+
+Because the naming is a contract with HiveHub, the board token and layout have
+to stay in sync with HiveHub's `rename_firmware.py`, `server/firmware.py`
+(`board_from_filename`, `BEECOUNTER_BOARDS`) and the dashboard's filename
+parsing. The header comment in `rename_firmware.py` lists them.
+
+The debug variant is stamped after the version rather than into the board token
+on purpose: `0.1.0-irdebug` is what shows up in the pre-filled Version field, so
+it is hard to publish by mistake, and HiveHub compares versions component-wise
+with non-digits stripped — such a build ties with the production image of the
+same version and can never be relayed over it.
+
 ---
 
 ## USB IR-sensor debug console (bench bring-up)
