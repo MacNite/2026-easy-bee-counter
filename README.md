@@ -347,12 +347,16 @@ Implemented in `Firmware/` (PlatformIO, `seeed_xiao_esp32c6` env). See
 `Firmware/README.md` for build/flash and tuning details.
 
 ### ESP32-C6 (bee counter)
-- **`Wire` (master):** continuously polls the 3× MCP23017 (~5 ms loop),
-  reading all 16 inputs per chip via `readGPIOAB()`.
+- **`Wire` (master):** continuously polls the 3× MCP23017 (~5 ms loop), reading
+  all 16 inputs per chip. Read failures are detected, so an expander that goes
+  missing has its gates skipped rather than read as "all beams blocked", and is
+  re-probed until it comes back.
 - **BLE/GATT peripheral:** serves lifetime totals as JSON on read, and accepts a
   firmware image on the OTA characteristics (`src/ble_link.cpp`).
 - Per-gate debounce + direction state machine (IDLE → INNER/OUTER_FIRST →
-  PAIRED) emits IN/OUT counts; glitches tallied for diagnostics.
+  PAIRED) emits IN/OUT counts; glitches tallied for diagnostics. The logic lives
+  in `Firmware/include/gate_logic.h` and is covered by host-side tests
+  (`Firmware/test/run_tests.sh`).
 - IR banks driven on GPIO19 / silk D8 (bank 1), GPIO20 / silk D9 (bank 2) and
   GPIO18 / silk D10 (bank 3) — one MOSFET per MCP23017; LED mode settable from
   the IR_DEBUG serial console.

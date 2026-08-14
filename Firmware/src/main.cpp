@@ -49,6 +49,7 @@
 
 #include "pins.h"
 #include "counter_protocol.h"
+#include "gate_logic.h"
 
 // The BLE/GATT transport: a connectable NimBLE GATT server serving the
 // measurement characteristic and the OTA characteristics. See ble_link.h.
@@ -69,10 +70,30 @@
 // ~2-3 samples, which is enough for the inner/outer ordering to be reliable.
 static constexpr uint32_t POLL_INTERVAL_MS = 5;
 
-// Minimum time a sensor must read "blocked" (LOW) to be considered a real
-// detection event rather than electrical noise. Bees crossing at ~25 cm/s
-// across a 3 mm beam dwell ~12 ms in the beam, so 3 ms debouncing is plenty.
-static constexpr uint32_t SENSOR_DEBOUNCE_MS = 3;
+// Minimum time a sensor must hold a NEW value before that value is accepted as
+// the debounced state. See gate_logic.h for how the debounce is implemented and
+// why the previous version did not actually enforce this.
+//
+// This has to be read together with SENSOR_DEBOUNCE_SAMPLES below and with
+// POLL_INTERVAL_MS: a threshold shorter than one poll period cannot reject
+// anything, because the first differing sample already satisfies it. The old
+// 3 ms value was exactly that case (3 < 5), which is why the sample count is
+// the load-bearing half of the rule at the current poll rate.
+static constexpr uint32_t SENSOR_DEBOUNCE_MS = 5;
+
+// How many consecutive polls must agree before a sensor change is accepted.
+//
+// Two is the most the beam physics allow here. A bee crossing at ~25 cm/s
+// dwells ~12 ms in a 3 mm beam, i.e. 2-3 samples at POLL_INTERVAL_MS=5, so
+// requiring three consecutive agreeing samples (~10 ms) would start dropping
+// real crossings. Two rejects the single corrupted or noisy word — the failure
+// mode the old code was blind to — while accepting a genuine block ~5 ms after
+// it first appears, comfortably inside the dwell.
+//
+// If you ever raise POLL_INTERVAL_MS, this must stay at 2 (or the debounce
+// window grows past the dwell and crossings are silently lost); if you lower it
+// well below 5 ms, raise this instead of SENSOR_DEBOUNCE_MS.
+static constexpr uint8_t SENSOR_DEBOUNCE_SAMPLES = 2;
 
 // Maximum elapsed time between the two sensors of one gate triggering for
 // the pair to count as a directional crossing. Anything longer is just a
@@ -132,28 +153,21 @@ static constexpr uint32_t LED_SETTLE_US = 250;
 //     first BLOCKED = Inner -> then Outer BLOCKED  =>  OUTGOING bee
 //
 // After an event the gate resets to IDLE only once BOTH sensors have
-// returned to CLEAR for at least SENSOR_DEBOUNCE_MS.
+// returned to CLEAR (each having passed the debounce rule above).
+//
+// The debounce and the state machine themselves live in include/gate_logic.h,
+// free of Arduino dependencies, so the timing rules can be exercised by the
+// host-side tests in test/test_gate_logic/ instead of only on a live hive.
 // ============================================================================
 
-enum class GateState : uint8_t {
-    IDLE,           // both sensors clear, no event in progress
-    OUTER_FIRST,    // outer triggered first, awaiting inner
-    INNER_FIRST,    // inner triggered first, awaiting outer
-    PAIRED,         // both triggered, waiting for both to clear
-};
+static gatelogic::GateRuntime g_gate_rt[gates::NUM_GATES];
 
-struct GateRuntime {
-    GateState state = GateState::IDLE;
-    bool inner_blocked = false;
-    bool outer_blocked = false;
-    uint32_t inner_change_ms = 0;     // last sample-time the inner toggled
-    uint32_t outer_change_ms = 0;
-    uint32_t event_start_ms = 0;      // when current pairing began
-    uint32_t inner_stuck_since_ms = 0;
-    uint32_t outer_stuck_since_ms = 0;
+static constexpr gatelogic::Tuning GATE_TUNING = {
+    SENSOR_DEBOUNCE_MS,
+    SENSOR_DEBOUNCE_SAMPLES,
+    GATE_PAIRING_WINDOW_MS,
+    SENSOR_STUCK_MS,
 };
-
-static GateRuntime g_gate_rt[gates::NUM_GATES];
 
 // Aggregate counters. LIFETIME totals only: the BLE contract is totals-only and
 // HiveHub derives each interval by differencing consecutive reads, so a missed
@@ -166,15 +180,72 @@ static volatile uint16_t g_glitch_count  = 0;
 static volatile uint8_t  g_status_flags  = 0;
 
 // ============================================================================
-// MCP23017 driver objects  (all on Wire / bus 0)
+// MCP23017 channels + runtime health  (all on Wire / bus 0)
 // ============================================================================
-static Adafruit_MCP23X17 g_mcp_u2;   // 0x20, gates 00..07
-static Adafruit_MCP23X17 g_mcp_u3;   // 0x21, gates 10..17
-static Adafruit_MCP23X17 g_mcp_u4;   // 0x22, gates 20..27
+//
+// Health used to be decided once, in setup(), and never revisited. That made
+// two failure modes invisible:
+//
+//   * a chip absent at boot could never come back without a power cycle, and
+//   * a chip that died AFTER boot kept being reported healthy, while its port
+//     word read as all-zeros — which this firmware interprets as "every beam
+//     blocked" — so its eight gates silently pinned into PAIRED, inflated the
+//     glitch tally and eventually latched the sensor-fault flag.
+//
+// So each chip now carries a small health record: consecutive failures (one
+// transient NAK is not a dead chip), a validity flag for the current poll's
+// snapshot, and a retry deadline. Gates are only fed from a snapshot marked
+// valid, and the STATUS_MCP_U*_OK bits plus gates_healthy telemetry now track
+// the live state instead of boot-time discovery.
+static constexpr uint8_t NUM_MCP = 3;
 
-static bool g_mcp_u2_ok = false;
-static bool g_mcp_u3_ok = false;
-static bool g_mcp_u4_ok = false;
+// Consecutive failed reads before a chip is declared unhealthy. Its gates are
+// skipped from the first failure regardless; this only controls when we stop
+// trusting the chip altogether, tear its gates down and start re-probing.
+static constexpr uint8_t MCP_FAIL_THRESHOLD = 3;
+
+// How often an unhealthy chip is re-probed. Each attempt is one addressed
+// transaction that a missing chip NAKs immediately, so this is cheap; it runs
+// before the emitters are lit so a failed probe never extends the LED pulse.
+static constexpr uint32_t MCP_RETRY_INTERVAL_MS = 5000;
+
+// MCP23017 register address of GPIOA with IOCON.BANK=0 (the power-on default,
+// which the Adafruit driver leaves alone). GPIOB follows at 0x13 and the chip's
+// sequential-read mode returns both from one 2-byte read — the same access
+// readGPIOAB() performs, but issued directly so the I2C transaction result is
+// actually visible to us. readGPIOAB() returns a bare uint16_t and reports a
+// failed bus transaction as 0x0000, i.e. as "all sensors blocked".
+static constexpr uint8_t MCP23X17_REG_GPIOA = 0x12;
+
+static Adafruit_MCP23X17 g_mcp_dev[NUM_MCP];
+
+struct McpHealth {
+    uint8_t     addr;
+    uint8_t     status_bit;
+    const char* tag;
+    bool        ok;             // chip is believed present and answering
+    uint8_t     fail_streak;    // consecutive failed reads
+    uint32_t    next_retry_ms;  // when to re-probe while !ok
+    uint16_t    value;          // this poll's port word (GPIOA | GPIOB << 8)
+    bool        valid;          // is `value` from a successful read this poll?
+};
+
+static McpHealth g_mcp[NUM_MCP] = {
+    { i2c_addr::MCP_GATES_00_07, beecounter_proto::STATUS_MCP_U2_OK,
+      "U2 (gates 00..07)", false, 0, 0, 0, false },
+    { i2c_addr::MCP_GATES_10_17, beecounter_proto::STATUS_MCP_U3_OK,
+      "U3 (gates 10..17)", false, 0, 0, 0, false },
+    { i2c_addr::MCP_GATES_20_27, beecounter_proto::STATUS_MCP_U4_OK,
+      "U4 (gates 20..27)", false, 0, 0, 0, false },
+};
+
+// gates::TABLE identifies a chip by I2C address; the health records are indexed.
+static int8_t mcpIndexForAddress(uint8_t addr) {
+    for (uint8_t i = 0; i < NUM_MCP; i++) {
+        if (g_mcp[i].addr == addr) return (int8_t)i;
+    }
+    return -1;
+}
 
 // LED-bank control.
 // AUTO now PULSES the LEDs: they are lit only for the settle+read window of
@@ -215,133 +286,160 @@ static void setIrLeds(bool on) {
 
 
 // ============================================================================
+// MCP23017 acquisition + health
+// ============================================================================
+
+static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag,
+                    bool quiet = false) {
+    if (!mcp.begin_I2C(addr, &Wire)) {
+        if (!quiet) Serial.printf("[MCP] %s @ 0x%02X: NOT FOUND\n", tag, addr);
+        return false;
+    }
+    // All 16 pins are sensor inputs. The board provides 100k pull-ups, so we
+    // use plain INPUT (not INPUT_PULLUP) to keep the MCP's weak internal
+    // pull-ups out of the picture.
+    for (uint8_t p = 0; p < 16; p++) {
+        mcp.pinMode(p, INPUT);
+    }
+    if (!quiet) Serial.printf("[MCP] %s @ 0x%02X: OK\n", tag, addr);
+    return true;
+}
+
+// Drop every gate on this chip back to a clean IDLE. Called whenever a chip
+// changes health in either direction, so that a half-finished pairing from
+// before an outage cannot combine with a sensor reading from after it and
+// fabricate a crossing. The counters are lifetime totals and are untouched.
+static void resetGatesForMcp(uint8_t addr) {
+    for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
+        if (gates::TABLE[i].mcp_address == addr) {
+            g_gate_rt[i] = gatelogic::GateRuntime();
+        }
+    }
+}
+
+// One checked 2-byte read of GPIOA/GPIOB. Unlike readGPIOAB() this reports bus
+// failures instead of silently returning 0x0000 ("all blocked").
+static bool readMcpChecked(uint8_t idx, uint16_t& out) {
+    const uint8_t addr = g_mcp[idx].addr;
+    Wire.beginTransmission(addr);
+    Wire.write(MCP23X17_REG_GPIOA);
+    if (Wire.endTransmission(false) != 0) return false;   // repeated start
+    if (Wire.requestFrom((int)addr, (int)2) != 2) return false;
+    const uint8_t a = (uint8_t)Wire.read();   // GPIOA -> inner sensors
+    const uint8_t b = (uint8_t)Wire.read();   // GPIOB -> outer sensors
+    out = (uint16_t)a | ((uint16_t)b << 8);
+    return true;
+}
+
+// Fold one poll's read result into a chip's health record.
+static void noteMcpResult(uint8_t idx, bool read_ok, uint32_t now_ms) {
+    McpHealth& m = g_mcp[idx];
+    if (read_ok) {
+        m.fail_streak = 0;
+        return;
+    }
+    if (m.fail_streak < 0xFF) m.fail_streak++;
+    if (m.ok && m.fail_streak >= MCP_FAIL_THRESHOLD) {
+        m.ok = false;
+        m.valid = false;
+        g_status_flags &= (uint8_t)~m.status_bit;
+        m.next_retry_ms = now_ms + MCP_RETRY_INTERVAL_MS;
+        resetGatesForMcp(m.addr);
+        Serial.printf("[MCP] %s @ 0x%02X: lost after %u failed reads\n",
+                      m.tag, m.addr, (unsigned)m.fail_streak);
+    }
+}
+
+// Does anything ACK at this address? One addressed byte, no data phase.
+static bool mcpPresent(uint8_t addr) {
+    Wire.beginTransmission(addr);
+    return Wire.endTransmission() == 0;
+}
+
+// Re-probe an unhealthy chip, at most once per MCP_RETRY_INTERVAL_MS. Runs with
+// the emitters dark, before the sampling window.
+static void retryMcp(uint8_t idx, uint32_t now_ms) {
+    McpHealth& m = g_mcp[idx];
+    if (m.ok) return;
+    if ((int32_t)(now_ms - m.next_retry_ms) < 0) return;
+    m.next_retry_ms = now_ms + MCP_RETRY_INTERVAL_MS;
+
+    // Cheap ACK probe first, so the full re-init only runs when the chip is
+    // genuinely back. begin_I2C() reallocates the driver's bus object; gating
+    // it on presence keeps a permanently absent chip from churning that
+    // allocation every retry for the life of the device.
+    if (!mcpPresent(m.addr)) return;
+
+    // quiet: a chip that ACKs but fails to configure would otherwise log on
+    // every retry.
+    if (!initMcp(g_mcp_dev[idx], m.addr, m.tag, /*quiet=*/true)) return;
+
+    m.ok = true;
+    m.fail_streak = 0;
+    g_status_flags |= m.status_bit;
+    resetGatesForMcp(m.addr);
+    Serial.printf("[MCP] %s @ 0x%02X: recovered\n", m.tag, m.addr);
+}
+
+// ============================================================================
 // Crossing detection
 // ============================================================================
 
-// Process one gate after its two sensor states have been freshly read.
-// raw_inner / raw_outer: true means "beam blocked" (sensor reads LOW).
-static void updateGate(uint8_t gate_idx, bool raw_inner, bool raw_outer,
-                       uint32_t now_ms) {
-    GateRuntime& rt = g_gate_rt[gate_idx];
-
-    // ----- debounce -----
-    if (raw_inner != rt.inner_blocked &&
-        now_ms - rt.inner_change_ms >= SENSOR_DEBOUNCE_MS) {
-        rt.inner_blocked    = raw_inner;
-        rt.inner_change_ms  = now_ms;
-        if (raw_inner) rt.inner_stuck_since_ms = now_ms;
-    } else if (raw_inner == rt.inner_blocked) {
-        rt.inner_change_ms  = now_ms;   // refresh "still in this state" stamp
-    }
-
-    if (raw_outer != rt.outer_blocked &&
-        now_ms - rt.outer_change_ms >= SENSOR_DEBOUNCE_MS) {
-        rt.outer_blocked    = raw_outer;
-        rt.outer_change_ms  = now_ms;
-        if (raw_outer) rt.outer_stuck_since_ms = now_ms;
-    } else if (raw_outer == rt.outer_blocked) {
-        rt.outer_change_ms  = now_ms;
-    }
-
-    // ----- stuck-sensor health check -----
-    if (rt.inner_blocked && now_ms - rt.inner_stuck_since_ms > SENSOR_STUCK_MS) {
-        g_status_flags |= beecounter_proto::STATUS_SENSOR_FAULT_FLAG;
-    }
-    if (rt.outer_blocked && now_ms - rt.outer_stuck_since_ms > SENSOR_STUCK_MS) {
-        g_status_flags |= beecounter_proto::STATUS_SENSOR_FAULT_FLAG;
-    }
-
-    // ----- state machine -----
-    switch (rt.state) {
-    case GateState::IDLE:
-        if (rt.inner_blocked && !rt.outer_blocked) {
-            rt.state = GateState::INNER_FIRST;
-            rt.event_start_ms = now_ms;
-        } else if (rt.outer_blocked && !rt.inner_blocked) {
-            rt.state = GateState::OUTER_FIRST;
-            rt.event_start_ms = now_ms;
-        } else if (rt.inner_blocked && rt.outer_blocked) {
-            // both blocked at the same poll -- ambiguous direction, treat
-            // as a glitch and stay paired until both clear.
-            rt.state = GateState::PAIRED;
-            g_glitch_count += 1;
-        }
-        break;
-
-    case GateState::INNER_FIRST:
-        // expecting outer to block next -> OUTGOING bee
-        if (now_ms - rt.event_start_ms > GATE_PAIRING_WINDOW_MS) {
-            // timeout: bee stayed inside or backed off. Reset on clear.
-            if (!rt.inner_blocked && !rt.outer_blocked) {
-                rt.state = GateState::IDLE;
-            }
-        } else if (rt.outer_blocked) {
-            // direction confirmed
-            g_total_out += 1;
-            rt.state = GateState::PAIRED;
-        } else if (!rt.inner_blocked) {
-            // inner cleared before outer ever blocked: false start
-            rt.state = GateState::IDLE;
-            g_glitch_count += 1;
-        }
-        break;
-
-    case GateState::OUTER_FIRST:
-        // expecting inner to block next -> INCOMING bee
-        if (now_ms - rt.event_start_ms > GATE_PAIRING_WINDOW_MS) {
-            if (!rt.inner_blocked && !rt.outer_blocked) {
-                rt.state = GateState::IDLE;
-            }
-        } else if (rt.inner_blocked) {
-            g_total_in += 1;
-            rt.state = GateState::PAIRED;
-        } else if (!rt.outer_blocked) {
-            rt.state = GateState::IDLE;
-            g_glitch_count += 1;
-        }
-        break;
-
-    case GateState::PAIRED:
-        // wait until both sensors clear, then return to IDLE
-        if (!rt.inner_blocked && !rt.outer_blocked) {
-            rt.state = GateState::IDLE;
-        }
-        break;
-    }
-
-    // overflow detection on the lifetime counters
-    if (g_total_in == 0xFFFFFFFFu || g_total_out == 0xFFFFFFFFu) {
+// Saturating lifetime totals: see gatelogic::countSaturating. The flag is
+// raised as soon as a counter reaches its maximum, and it stays pinned there
+// rather than wrapping to zero behind HiveHub's back.
+static void countCrossing(volatile uint32_t& total) {
+    if (gatelogic::countSaturating(total)) {
         g_status_flags |= beecounter_proto::STATUS_OVERFLOW_FLAG;
     }
 }
 
-// Read all three MCP23017s into v_u2/v_u3/v_u4. The emitters must already be
-// lit and settled before this is called. Returns false if any chip failed to
-// respond (its value is left at 0 = all-blocked, but the caller skips updating
-// gates on a failed chip via the any_fail path it tracks separately).
-static bool readAllMcp(uint16_t& v_u2, uint16_t& v_u3, uint16_t& v_u4) {
-    bool any_fail = false;
-    v_u2 = v_u3 = v_u4 = 0;
-    if (g_mcp_u2_ok) v_u2 = g_mcp_u2.readGPIOAB(); else any_fail = true;
-    if (g_mcp_u3_ok) v_u3 = g_mcp_u3.readGPIOAB(); else any_fail = true;
-    if (g_mcp_u4_ok) v_u4 = g_mcp_u4.readGPIOAB(); else any_fail = true;
-    return !any_fail;
+// Read every healthy MCP23017 into its health record. The emitters must
+// already be lit and settled before this is called.
+//
+// Each record's `valid` flag says whether THIS poll's word can be trusted. A
+// chip that is unhealthy, or that failed its read this cycle, is left invalid
+// and its gates are skipped entirely — the old code left the word at zero and
+// fed it to the state machine anyway, which reads as "all 16 beams blocked".
+//
+// Returns false if any chip did not produce a usable word.
+static bool readAllMcp(uint32_t now_ms) {
+    bool all_ok = true;
+    for (uint8_t i = 0; i < NUM_MCP; i++) {
+        McpHealth& m = g_mcp[i];
+        m.valid = false;
+        m.value = 0;
+        if (!m.ok) {
+            all_ok = false;
+            continue;
+        }
+        uint16_t v = 0;
+        const bool read_ok = readMcpChecked(i, v);
+        if (read_ok) {
+            m.value = v;
+            m.valid = true;
+        } else {
+            all_ok = false;
+        }
+        noteMcpResult(i, read_ok, now_ms);
+    }
+    return all_ok;
 }
 
 // Acquire one fresh set of sensor readings with the emitters pulsed on only for
 // the settle + read window. In FORCE_ON the emitters are already steady-on, so
 // we skip the extra toggling. In FORCE_OFF we never light them (readings will
 // look "clear"), preserving the diagnostic meaning of that mode.
-static bool sampleGates(uint16_t& v_u2, uint16_t& v_u3, uint16_t& v_u4) {
+static bool sampleGates(uint32_t now_ms) {
     switch (g_led_mode) {
     case LedMode::FORCE_OFF:
         // Emitters stay dark; read whatever the sensors show (nominally clear).
-        return readAllMcp(v_u2, v_u3, v_u4);
+        return readAllMcp(now_ms);
 
     case LedMode::FORCE_ON:
         // Emitters are already steady-on (set when the mode was entered); just
         // read. No per-sample toggling so a scope trace shows a clean DC level.
-        return readAllMcp(v_u2, v_u3, v_u4);
+        return readAllMcp(now_ms);
 
     case LedMode::AUTO:
     default:
@@ -350,24 +448,29 @@ static bool sampleGates(uint16_t& v_u2, uint16_t& v_u3, uint16_t& v_u4) {
         driveIrLeds(true);
         delayMicroseconds(LED_SETTLE_US);
         {
-            bool ok = readAllMcp(v_u2, v_u3, v_u4);
+            bool ok = readAllMcp(now_ms);
             driveIrLeds(false);
             return ok;
         }
     }
 }
 
-// Poll all three MCP23017s and update every gate. Returns false if any
-// chip failed to respond -- in that case we don't update the affected
-// gates' sensor state this cycle, which is harmless.
+// Poll all three MCP23017s and update every gate whose snapshot is trustworthy.
+// Returns false if any chip did not produce a usable word this cycle; gates on
+// such a chip are skipped rather than fed a fabricated all-blocked reading.
 static bool pollAllGates() {
     const uint32_t now_ms = millis();
 
+    // Re-probe anything currently marked unhealthy. Done first, with the
+    // emitters still dark, so a probe never lengthens the LED pulse.
+    for (uint8_t i = 0; i < NUM_MCP; i++) {
+        retryMcp(i, now_ms);
+    }
+
     // Acquire a fresh sensor snapshot with the emitters pulsed (AUTO) or steady
-    // (FORCE_ON) per the current LED mode. Adafruit_MCP23X17::readGPIOAB()
-    // returns GPIOA in the low byte and GPIOB in the high byte.
-    uint16_t v_u2 = 0, v_u3 = 0, v_u4 = 0;
-    bool ok = sampleGates(v_u2, v_u3, v_u4);
+    // (FORCE_ON) per the current LED mode. Each chip's word is GPIOA in the low
+    // byte and GPIOB in the high byte.
+    const bool ok = sampleGates(now_ms);
 
     // Named getBit to avoid clashing with Arduino.h's bit(b) macro.
     auto getBit = [](uint16_t v, uint8_t pin) -> bool {
@@ -376,18 +479,34 @@ static bool pollAllGates() {
 
     for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
         const auto& loc = gates::TABLE[i];
-        uint16_t v;
-        switch (loc.mcp_address) {
-        case i2c_addr::MCP_GATES_00_07: v = v_u2; break;
-        case i2c_addr::MCP_GATES_10_17: v = v_u3; break;
-        case i2c_addr::MCP_GATES_20_27: v = v_u4; break;
-        default: continue;
-        }
+        const int8_t ch = mcpIndexForAddress(loc.mcp_address);
+        if (ch < 0 || !g_mcp[ch].valid) continue;   // no trustworthy sample
+        const uint16_t v = g_mcp[ch].value;
+
         // QRE1113 phototransistor: BLOCKED -> sensor line LOW (bit=0).
         // We pass "blocked = (bit == 0)" into the state machine.
-        bool inner_blocked = !getBit(v, loc.inner_pin);
-        bool outer_blocked = !getBit(v, loc.outer_pin);
-        updateGate(i, inner_blocked, outer_blocked, now_ms);
+        const bool inner_blocked = !getBit(v, loc.inner_pin);
+        const bool outer_blocked = !getBit(v, loc.outer_pin);
+
+        const gatelogic::GateUpdate u = gatelogic::updateGate(
+            g_gate_rt[i], inner_blocked, outer_blocked, now_ms, GATE_TUNING);
+
+        switch (u.event) {
+        case gatelogic::GateEvent::BEE_IN:  countCrossing(g_total_in);  break;
+        case gatelogic::GateEvent::BEE_OUT: countCrossing(g_total_out); break;
+        case gatelogic::GateEvent::GLITCH:
+            // Saturating: a wrapping diagnostic counter can make a badly
+            // unhealthy device look healthier than it did on the last read.
+            gatelogic::countSaturating(g_glitch_count);
+            break;
+        case gatelogic::GateEvent::NONE:
+        default:
+            break;
+        }
+
+        if (u.sensor_stuck) {
+            g_status_flags |= beecounter_proto::STATUS_SENSOR_FAULT_FLAG;
+        }
     }
 
     return ok;
@@ -436,25 +555,29 @@ static void irDebugPrintHelp() {
 // readout is always valid on the bench even in AUTO/FORCE_OFF; afterwards the
 // mode-correct steady level is restored.
 static void irDebugReadAndPrint() {
+    const uint32_t now_ms = millis();
     driveIrLeds(true);
     delayMicroseconds(LED_SETTLE_US);
-    uint16_t v_u2 = 0, v_u3 = 0, v_u4 = 0;
-    bool ok = readAllMcp(v_u2, v_u3, v_u4);
+    bool ok = readAllMcp(now_ms);
     setIrLeds(true);   // restore mode-correct steady level (OFF in AUTO)
 
     auto getBit = [](uint16_t v, uint8_t pin) -> bool { return (v >> pin) & 0x1; };
 
     Serial.printf("[IR] t=%lus raw U2=0x%04X U3=0x%04X U4=0x%04X read_ok=%d\n",
-                  (unsigned long)(millis() / 1000), v_u2, v_u3, v_u4, ok ? 1 : 0);
+                  (unsigned long)(now_ms / 1000), g_mcp[0].value, g_mcp[1].value,
+                  g_mcp[2].value, ok ? 1 : 0);
     for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
         const auto& loc = gates::TABLE[i];
-        uint16_t v;
-        switch (loc.mcp_address) {
-        case i2c_addr::MCP_GATES_00_07: v = v_u2; break;
-        case i2c_addr::MCP_GATES_10_17: v = v_u3; break;
-        case i2c_addr::MCP_GATES_20_27: v = v_u4; break;
-        default: continue;
+        const int8_t ch = mcpIndexForAddress(loc.mcp_address);
+        if (ch < 0) continue;
+        if (!g_mcp[ch].valid) {
+            // Printing "clear" here would be a lie: an unread chip has no state.
+            Serial.printf("  %-8s bank:%u  <no reading: %s>\n", loc.tag,
+                          (unsigned)loc.led_bank,
+                          g_mcp[ch].ok ? "read failed" : "chip unhealthy");
+            continue;
         }
+        const uint16_t v = g_mcp[ch].value;
         // BLOCKED == beam reflected/interrupted == sensor line LOW (bit 0).
         bool inner_blocked = !getBit(v, loc.inner_pin);
         bool outer_blocked = !getBit(v, loc.outer_pin);
@@ -554,39 +677,24 @@ namespace ble {
 void getTelemetry(Telemetry& t) {
     uint32_t up = millis() / 1000;
     if (up > 0xFFFF) up = 0xFFFF;
+    // Live health, not the boot-time snapshot this used to report: a chip that
+    // died after setup() now shows up here (and in the STATUS_MCP_U*_OK bits),
+    // and one that recovers is counted again.
+    uint8_t healthy = 0;
+    for (uint8_t i = 0; i < NUM_MCP; i++) {
+        if (g_mcp[i].ok) healthy++;
+    }
     t.protocol_version = beecounter_proto::PROTOCOL_VERSION;
     t.status_flags     = g_status_flags;
     t.uptime_s         = (uint16_t)up;
     t.num_gates        = gates::NUM_GATES;
-    t.gates_healthy    = (uint8_t)((g_mcp_u2_ok ? 1 : 0) +
-                                   (g_mcp_u3_ok ? 1 : 0) +
-                                   (g_mcp_u4_ok ? 1 : 0));
+    t.gates_healthy    = healthy;
     t.total_in         = g_total_in;
     t.total_out        = g_total_out;
     t.glitch_count     = g_glitch_count;
 }
 
 }  // namespace ble
-
-
-// ============================================================================
-// Bring-up helpers
-// ============================================================================
-
-static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag) {
-    if (!mcp.begin_I2C(addr, &Wire)) {
-        Serial.printf("[MCP] %s @ 0x%02X: NOT FOUND\n", tag, addr);
-        return false;
-    }
-    // All 16 pins are sensor inputs. The board provides 100k pull-ups, so we
-    // use plain INPUT (not INPUT_PULLUP) to keep the MCP's weak internal
-    // pull-ups out of the picture.
-    for (uint8_t p = 0; p < 16; p++) {
-        mcp.pinMode(p, INPUT);
-    }
-    Serial.printf("[MCP] %s @ 0x%02X: OK\n", tag, addr);
-    return true;
-}
 
 
 // ============================================================================
@@ -614,13 +722,18 @@ void setup() {
     // used to run a permanent slave for the HiveScale, and that link is gone.
     Wire.begin(pins::I2C_SDA, pins::I2C_SCL, (uint32_t)I2C_MASTER_HZ);
 
-    g_mcp_u2_ok = initMcp(g_mcp_u2, i2c_addr::MCP_GATES_00_07, "U2 (gates 00..07)");
-    g_mcp_u3_ok = initMcp(g_mcp_u3, i2c_addr::MCP_GATES_10_17, "U3 (gates 10..17)");
-    g_mcp_u4_ok = initMcp(g_mcp_u4, i2c_addr::MCP_GATES_20_27, "U4 (gates 20..27)");
-
-    if (g_mcp_u2_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U2_OK;
-    if (g_mcp_u3_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U3_OK;
-    if (g_mcp_u4_ok) g_status_flags |= beecounter_proto::STATUS_MCP_U4_OK;
+    // Boot-time discovery. A chip that is missing here is NOT written off: it
+    // is left unhealthy, its gates are skipped, and pollAllGates() re-probes it
+    // every MCP_RETRY_INTERVAL_MS until it answers.
+    for (uint8_t i = 0; i < NUM_MCP; i++) {
+        g_mcp[i].ok = initMcp(g_mcp_dev[i], g_mcp[i].addr, g_mcp[i].tag);
+        g_mcp[i].fail_streak = 0;
+        if (g_mcp[i].ok) {
+            g_status_flags |= g_mcp[i].status_bit;
+        } else {
+            g_mcp[i].next_retry_ms = millis() + MCP_RETRY_INTERVAL_MS;
+        }
+    }
 
     ble::begin();   // connectable NimBLE GATT server on the GPIO-less radio
 
