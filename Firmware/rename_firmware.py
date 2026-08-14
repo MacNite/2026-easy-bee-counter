@@ -10,7 +10,12 @@ That name is what makes an image self-describing to HiveHub. Its firmware
 upload form parses the filename and pre-fills the release for you:
 
   * the leading ``hivetraffic`` token selects target *HiveTraffic counter*
-    (``beecounter`` server-side) instead of leaving the default main unit,
+    (``beecounter`` server-side) instead of leaving the default main unit.
+    This is a convenience in the dashboard form only — the backend never infers
+    the target from a filename, it reads the explicit ``target`` field — so the
+    token saves an operator a mis-click, it does not enforce anything. (Its
+    regex also matches a ``beecounter`` prefix, so an image named that way is
+    targeted correctly too rather than silently mis-filed.)
   * the ``esp32-c6`` token is the board the release is stamped with — the
     backend refuses to publish a release whose declared board disagrees with
     its filename, which is what stops a cross-architecture image from ever

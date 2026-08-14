@@ -1,10 +1,17 @@
 #!/bin/sh
 # Build and run the host-side logic tests.
 #
-# These cover include/gate_logic.h — the sensor debounce, the per-gate crossing
-# state machine and the saturating counters — none of which need an ESP32, an
-# MCP23017 or a bee. Everything hardware-facing stays in src/main.cpp and is
-# still verified on the bench (see the IR_DEBUG console in the README).
+# These cover the two pure headers, neither of which needs an ESP32, an
+# MCP23017 or a bee:
+#
+#   * include/gate_logic.h      — sensor debounce, the per-gate crossing state
+#                                 machine, and the saturating counters;
+#   * include/measurement_json.h — the exact bytes of the BLE measurement
+#                                 characteristic, i.e. HiveHub's half of the
+#                                 wire contract.
+#
+# Everything hardware-facing stays in src/main.cpp and is still verified on the
+# bench (see the IR_DEBUG console in the README).
 #
 #     ./test/run_tests.sh
 #
@@ -23,3 +30,10 @@ trap 'rm -rf "$OUT"' EXIT
     -o "$OUT/test_gate_logic"
 
 "$OUT/test_gate_logic"
+
+"$CXX" -std=c++11 -Wall -Wextra -Werror \
+    -I include \
+    test/test_measurement_json/test_measurement_json.cpp \
+    -o "$OUT/test_measurement_json"
+
+"$OUT/test_measurement_json"

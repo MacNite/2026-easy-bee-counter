@@ -315,12 +315,22 @@ static void test_totals_saturate() {
 }
 
 static void test_glitches_saturate() {
-    g_case = "16-bit glitches saturate";
-    uint16_t glitches = UINT16_MAX - 1;
+    // The glitch tally shares the 32-bit counter as of protocol v3. It is
+    // checked separately from the totals because it is the counter that a
+    // genuinely broken device can actually drive to the ceiling, and it used to
+    // do so at 65535 — where the old uint16_t stopped saying anything useful.
+    g_case = "glitches saturate at 32 bits, not 16";
+    uint32_t glitches = UINT16_MAX - 1;
+    CHECK(!countSaturating(glitches));
+    CHECK(glitches == UINT16_MAX);      // the old ceiling is now just a number
+    CHECK(!countSaturating(glitches));
+    CHECK(glitches == (uint32_t)UINT16_MAX + 1);
+
+    glitches = UINT32_MAX - 1;
     CHECK(countSaturating(glitches));
-    CHECK(glitches == UINT16_MAX);
+    CHECK(glitches == UINT32_MAX);
     CHECK(countSaturating(glitches));
-    CHECK(glitches == UINT16_MAX);      // must not wrap to 0
+    CHECK(glitches == UINT32_MAX);      // must not wrap to 0
 }
 
 // --------------------------------------------------------------------------

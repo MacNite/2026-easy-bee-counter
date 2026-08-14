@@ -176,7 +176,10 @@ static constexpr gatelogic::Tuning GATE_TUNING = {
 static volatile uint32_t g_total_in  = 0;
 static volatile uint32_t g_total_out = 0;
 
-static volatile uint16_t g_glitch_count  = 0;
+// 32-bit since protocol v3. It saturates rather than wrapping either way, but
+// as a uint16_t a noisy device pinned at 65535 was reporting a bounded number
+// that said nothing about how bad things had got.
+static volatile uint32_t g_glitch_count  = 0;
 static volatile uint8_t  g_status_flags  = 0;
 
 // ============================================================================
@@ -195,7 +198,7 @@ static volatile uint8_t  g_status_flags  = 0;
 // So each chip now carries a small health record: consecutive failures (one
 // transient NAK is not a dead chip), a validity flag for the current poll's
 // snapshot, and a retry deadline. Gates are only fed from a snapshot marked
-// valid, and the STATUS_MCP_U*_OK bits plus gates_healthy telemetry now track
+// valid, and the STATUS_MCP_U*_OK bits plus the mcps_healthy telemetry now track
 // the live state instead of boot-time discovery.
 static constexpr uint8_t NUM_MCP = 3;
 
@@ -675,8 +678,12 @@ static void irDebugPoll() {
 namespace ble {
 
 void getTelemetry(Telemetry& t) {
-    uint32_t up = millis() / 1000;
-    if (up > 0xFFFF) up = 0xFFFF;
+    // No clamp since protocol v3: uptime_s is a uint32_t on both sides of the
+    // link. millis() itself rolls over at ~49.7 days, so this still restarts
+    // then — the field reports time since the last millis() epoch, which is
+    // what an unexpected reset shows up in. (A 32-bit second counter would run
+    // ~136 years; the rollover, not the width, is now the limit.)
+    const uint32_t up = millis() / 1000;
     // Live health, not the boot-time snapshot this used to report: a chip that
     // died after setup() now shows up here (and in the STATUS_MCP_U*_OK bits),
     // and one that recovers is counted again.
@@ -686,9 +693,9 @@ void getTelemetry(Telemetry& t) {
     }
     t.protocol_version = beecounter_proto::PROTOCOL_VERSION;
     t.status_flags     = g_status_flags;
-    t.uptime_s         = (uint16_t)up;
+    t.uptime_s         = up;
     t.num_gates        = gates::NUM_GATES;
-    t.gates_healthy    = healthy;
+    t.mcps_healthy     = healthy;
     t.total_in         = g_total_in;
     t.total_out        = g_total_out;
     t.glitch_count     = g_glitch_count;
@@ -795,11 +802,11 @@ void loop() {
         last_dump_ms = now;
         Serial.printf(
             "[STAT] uptime=%lus total_in=%lu total_out=%lu "
-            "glitches=%u status=0x%02X\n",
+            "glitches=%lu status=0x%02X\n",
             (unsigned long)(now / 1000),
             (unsigned long)g_total_in,
             (unsigned long)g_total_out,
-            (unsigned)g_glitch_count,
+            (unsigned long)g_glitch_count,
             (unsigned)g_status_flags
         );
     }

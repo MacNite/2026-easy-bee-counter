@@ -7,6 +7,7 @@
 #include <stdio.h>
 
 #include "counter_protocol.h"
+#include "measurement_json.h"
 #include "version.h"
 
 namespace ble {
@@ -23,6 +24,18 @@ constexpr uint8_t OTA_OP_BEGIN = 0x01;
 constexpr uint8_t OTA_OP_END = 0x03;
 constexpr uint8_t OTA_OP_ABORT = 0x04;
 constexpr uint32_t OTA_REBOOT_DELAY_MS = 1500;
+// How often, at most, a DATA write refreshes the OTA status characteristic and
+// notifies subscribers.
+//
+// Time-based rather than byte-based (the alternative was every 4-16 KiB) because
+// it bounds the notification rate no matter how fast the transfer runs: a
+// byte-based threshold ties the rate to throughput, so a 517-byte-MTU link with
+// a short connection interval turns a multi-megabyte image into a notify storm
+// competing with the DATA writes it is reporting on, while the same threshold on
+// a slow link goes nearly silent. 250 ms is at most four notifications per
+// second — a smooth progress bar, and negligible next to the data traffic —
+// regardless of MTU, connection interval or image size.
+constexpr uint32_t OTA_PROGRESS_NOTIFY_INTERVAL_MS = 250;
 
 using namespace beecounter_proto;
 
@@ -34,6 +47,7 @@ uint32_t otaSize = 0;
 uint32_t otaExpectedCrc = 0;
 uint32_t otaRunningCrc = 0xFFFFFFFFUL;
 uint32_t otaRebootAt = 0;
+uint32_t otaLastNotifyMs = 0;
 
 static uint32_t crc32Update(uint32_t crc, const uint8_t* data, size_t length) {
     while (length--) {
@@ -47,20 +61,26 @@ static uint32_t crc32Update(uint32_t crc, const uint8_t* data, size_t length) {
     return crc;
 }
 
+// Build the current six-byte, little-endian status (the same layout HiveInside
+// uses). Snapshotting otaReceived once matters: the four length bytes must
+// describe one instant, not four.
+static void buildOtaStatusValue(uint8_t (&value)[6]) {
+    const uint32_t received = otaReceived;
+    value[0] = otaState;
+    value[1] = static_cast<uint8_t>(received);
+    value[2] = static_cast<uint8_t>(received >> 8);
+    value[3] = static_cast<uint8_t>(received >> 16);
+    value[4] = static_cast<uint8_t>(received >> 24);
+    value[5] = otaError;
+}
+
 static void publishOtaStatus() {
     if (!otaStatus) return;
-    const uint32_t received = otaReceived;
-    // Same six-byte, little-endian status used by HiveInside.
-    uint8_t value[6] = {
-        otaState,
-        static_cast<uint8_t>(received),
-        static_cast<uint8_t>(received >> 8),
-        static_cast<uint8_t>(received >> 16),
-        static_cast<uint8_t>(received >> 24),
-        otaError,
-    };
+    uint8_t value[6];
+    buildOtaStatusValue(value);
     otaStatus->setValue(value, sizeof(value));
     otaStatus->notify();
+    otaLastNotifyMs = millis();
 }
 
 static void failOta(uint8_t state) {
@@ -74,19 +94,14 @@ static void failOta(uint8_t state) {
 static void refreshMeasurement(NimBLECharacteristic* characteristic) {
     Telemetry t{};
     getTelemetry(t);
-    // 224 bytes, not 192: the worst-case document (all fields saturated) is
-    // ~155 bytes with "ver" included, and a longer version string must not be
-    // able to push it over. snprintf truncation is caught below either way.
-    char json[224];
-    const int length = snprintf(
-        json, sizeof(json),
-        "{\"fw\":%u,\"ver\":\"%s\",\"uptime_s\":%u,\"status\":%u,"
-        "\"num_gates\":%u,\"gates_healthy\":%u,\"total_in\":%lu,"
-        "\"total_out\":%lu,\"glitches\":%u}",
-        t.protocol_version, HIVETRAFFIC_FW_VERSION, t.uptime_s, t.status_flags,
-        t.num_gates, t.gates_healthy, static_cast<unsigned long>(t.total_in),
-        static_cast<unsigned long>(t.total_out), t.glitch_count);
-    if (length <= 0 || static_cast<size_t>(length) >= sizeof(json)) {
+    // The document itself is built by the pure serializer in
+    // include/measurement_json.h, which is what test/test_measurement_json/
+    // exercises on a host compiler — including the saturated worst case that
+    // decides the buffer size below.
+    char json[MEASUREMENT_JSON_CAPACITY];
+    const int length = buildMeasurementJson(json, sizeof(json), t,
+                                            HIVETRAFFIC_FW_VERSION);
+    if (length <= 0) {
         Serial.println(F("[BLE] measurement serialization failed"));
         return;
     }
@@ -195,6 +210,26 @@ class OtaDataCallbacks : public NimBLECharacteristicCallbacks {
         }
         otaRunningCrc = crc32Update(otaRunningCrc, data, length);
         otaReceived += length;
+
+        // Throttled progress. Without this the characteristic held whatever
+        // BEGIN left in it — a `received` of zero — for the entire transfer,
+        // and subscribers got nothing between BEGIN and END, which made the
+        // four progress bytes look live while reporting a constant.
+        // Unsigned subtraction, so the millis() rollover needs no special case.
+        if (millis() - otaLastNotifyMs >= OTA_PROGRESS_NOTIFY_INTERVAL_MS) {
+            publishOtaStatus();
+        }
+    }
+};
+
+// A read must never be answered from a value last written 250 ms (or a whole
+// transfer) ago: a client that polls instead of subscribing gets the byte count
+// as of this instant.
+class OtaStatusCallbacks : public NimBLECharacteristicCallbacks {
+    void onRead(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+        uint8_t value[6];
+        buildOtaStatusValue(value);
+        characteristic->setValue(value, sizeof(value));
     }
 };
 
@@ -221,6 +256,7 @@ class ServerCallbacks : public NimBLEServerCallbacks {
 MeasurementCallbacks measurementCallbacks;
 OtaControlCallbacks otaControlCallbacks;
 OtaDataCallbacks otaDataCallbacks;
+OtaStatusCallbacks otaStatusCallbacks;
 ServerCallbacks serverCallbacks;
 
 }  // namespace
@@ -246,6 +282,7 @@ void begin() {
     payload->setCallbacks(&otaDataCallbacks);
     otaStatus = service->createCharacteristic(
         CHR_OTA_STATUS, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+    otaStatus->setCallbacks(&otaStatusCallbacks);
     publishOtaStatus();
     // No service->start(): in NimBLE 2.5.x it is a deprecated no-op. Services
     // are registered when the GATT server starts, which advertising->start()

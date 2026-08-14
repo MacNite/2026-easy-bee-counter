@@ -318,9 +318,14 @@ GATT contract lives in [`docs/ble-mode.md`](docs/ble-mode.md); this is a summary
 - The measurement value is built on read, so it is never a stale snapshot:
 
 ```json
-{"fw":2,"ver":"0.1.0","uptime_s":1234,"status":15,"num_gates":24,
- "gates_healthy":3,"total_in":100,"total_out":95,"glitches":2}
+{"fw":3,"ver":"0.1.0","uptime_s":1234,"status":15,"num_gates":24,
+ "mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2}
 ```
+
+`mcps_healthy` counts MCP23017 port expanders (0..3), not gates — each covers
+eight of the 24. `fw` is the wire format's revision, not the image version
+(`ver`); see [docs/ble-mode.md](docs/ble-mode.md) for the v2 → v3 delta and the
+deployment order it requires.
 
 ### Totals only
 

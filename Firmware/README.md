@@ -243,29 +243,40 @@ Each MCP23017 is tracked at runtime rather than only at boot:
 - An unhealthy chip (including one missing at boot) is re-probed every
   `MCP_RETRY_INTERVAL_MS`, with the emitters dark so a probe never lengthens the
   LED pulse. On recovery its gates are reset and its status bit is set again.
-- `gates_healthy` in the BLE telemetry reflects this live state.
+- `mcps_healthy` in the BLE telemetry reflects this live state — it counts
+  expanders (0..3), not gates. It was called `gates_healthy` before protocol v3.
 
 ---
 
 ## Tests
 
-The counting logic — sensor debounce, the per-gate direction state machine and
-the saturating counters — lives in `include/gate_logic.h`, deliberately free of
-Arduino, I2C and hardware dependencies so it can be run on a host compiler:
+Two pure headers carry logic that is worth testing without hardware, so both are
+deliberately free of Arduino, I2C and NimBLE dependencies and both run on a host
+compiler:
 
 ```
 ./test/run_tests.sh
 ```
 
-No ESP32, no MCP23017 and no bee required. The suite covers single-sample
-spikes, alternating noise, simultaneous transitions, minimum-dwell and repeated
-crossings, pairing-window expiry, stuck sensors, `millis()` rollover and counter
-saturation. Everything hardware-facing stays in `src/main.cpp` and is still
-verified on the bench with the IR-sensor console above.
+No ESP32, no MCP23017 and no bee required.
 
-Run it before pushing a change to the timing rules: the failure it was written
-to catch (a debounce that accepted the first differing sample) is invisible in a
-code read and effectively untestable on a live hive.
+* **`include/gate_logic.h`** — sensor debounce, the per-gate direction state
+  machine and the saturating counters. The suite covers single-sample spikes,
+  alternating noise, simultaneous transitions, minimum-dwell and repeated
+  crossings, pairing-window expiry, stuck sensors, `millis()` rollover and
+  counter saturation. Run it before pushing a change to the timing rules: the
+  failure it was written to catch (a debounce that accepted the first differing
+  sample) is invisible in a code read and effectively untestable on a live hive.
+* **`include/measurement_json.h`** — the exact bytes of the BLE measurement
+  characteristic, which is HiveHub's half of a two-repo contract. The suite
+  pins the field names, checks that `uptime_s` and `glitches` really do carry
+  values past their old 16-bit ceilings, and measures the saturated worst-case
+  document against the buffer it has to fit in. Run it before changing any
+  reported field — and bump `PROTOCOL_VERSION` and update HiveHub's parser in
+  the same revision when you do (see `docs/ble-mode.md`).
+
+Everything hardware-facing stays in `src/main.cpp` and is still verified on the
+bench with the IR-sensor console above.
 
 ---
 
