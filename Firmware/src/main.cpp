@@ -3,6 +3,10 @@
 // ----------------------------------------------------------------------------
 // Author: rewritten 2026 for the ESP32-C6 mini board.
 //
+// 2026-08 hardware revision: the IR emitters are split across THREE MOSFET
+// banks instead of two — one IRLB8721 per MCP23017, driven from silk D8/D9/D10
+// (GPIO19/GPIO20/GPIO18). See pins.h for the full map.
+//
 // 2026-06 power revision: the IR emitters are PULSED instead of left on
 // continuously. Each poll turns the emitter banks on only for the brief window
 // needed to settle the phototransistors and read the MCP23017s, then turns
@@ -95,15 +99,17 @@ static constexpr uint32_t I2C_MASTER_HZ = 400000;
 // 100k MCP pull-up against the phototransistor + any board capacitance.
 //
 // The sampling sequence each poll is:
-//     1. turn BOTH emitter banks ON
+//     1. turn ALL emitter banks ON
 //     2. busy-wait LED_SETTLE_US for the phototransistors to settle
 //     3. read all three MCP23017s (emitters stay on across the whole read)
-//     4. turn BOTH emitter banks OFF
+//     4. turn ALL emitter banks OFF
 //
-// Both banks are pulsed together (not per-bank) so that a single readGPIOAB()
-// sweep of all three chips sees every gate correctly lit; gates on U3 straddle
-// the two banks, so splitting the read per bank would needlessly double the
-// emitter on-time. Average emitter current ≈ peak * (settle + read) /
+// All banks are pulsed together (not per-bank) so that a single readGPIOAB()
+// sweep of all three chips sees every gate correctly lit. Since the 2026-08
+// revision each bank feeds exactly one MCP23017, so a per-bank read is now
+// possible in principle — but it would triple the number of settle windows
+// (each ~250 us) for no benefit, since the three chips are read back to back
+// anyway. Average emitter current ≈ peak * (settle + read) /
 // (POLL_INTERVAL_MS * 1000). With the defaults that is ~35% of the old
 // always-on draw; raise POLL_INTERVAL_MS and/or I2C_MASTER_HZ to push lower.
 //
@@ -182,14 +188,15 @@ static volatile LedMode g_led_mode = LedMode::AUTO;
 // Low-level helpers
 // ============================================================================
 
-// Drive both emitter-bank MOSFETs to the same state and update the status bit.
+// Drive every emitter-bank MOSFET to the same state and update the status bit.
 // This is the raw control used by FORCE_ON/FORCE_OFF and by the pulsed sampler.
 // It does NOT consult g_led_mode (the caller decides), so the pulsed sampler
 // can momentarily turn the LEDs on/off within AUTO mode without fighting the
 // mode gate.
 static void driveIrLeds(bool on) {
-    digitalWrite(pins::IR_LED_BANK_1_EN, on ? HIGH : LOW);
-    digitalWrite(pins::IR_LED_BANK_2_EN, on ? HIGH : LOW);
+    for (uint8_t b = 0; b < pins::NUM_LED_BANKS; b++) {
+        digitalWrite(pins::IR_LED_BANK_EN[b], on ? HIGH : LOW);
+    }
     if (on) g_status_flags |=  beecounter_proto::STATUS_IR_LEDS_ON;
     else    g_status_flags &= ~beecounter_proto::STATUS_IR_LEDS_ON;
 }
@@ -338,7 +345,7 @@ static bool sampleGates(uint16_t& v_u2, uint16_t& v_u3, uint16_t& v_u4) {
 
     case LedMode::AUTO:
     default:
-        // Pulsed path: light both banks, let the phototransistors settle, read
+        // Pulsed path: light all banks, let the phototransistors settle, read
         // across the lit window, then black the emitters out again.
         driveIrLeds(true);
         delayMicroseconds(LED_SETTLE_US);
@@ -450,7 +457,11 @@ static void irDebugReadAndPrint() {
         // BLOCKED == beam reflected/interrupted == sensor line LOW (bit 0).
         bool inner_blocked = !getBit(v, loc.inner_pin);
         bool outer_blocked = !getBit(v, loc.outer_pin);
-        Serial.printf("  %-8s inner:%-5s outer:%-5s\n", loc.tag,
+        // The bank column makes a dead emitter FET obvious on the bench: a
+        // whole bank reading "clear" with bees present points at Q1/Q2/Q3
+        // rather than at the sensors.
+        Serial.printf("  %-8s bank:%u inner:%-5s outer:%-5s\n", loc.tag,
+                      (unsigned)loc.led_bank,
                       inner_blocked ? "BLOCK" : "clear",
                       outer_blocked ? "BLOCK" : "clear");
     }
@@ -593,10 +604,10 @@ void setup() {
 
     // Configure LED enable pins -- start with LEDs off so we can verify
     // the MCP23017 pull-up baseline before powering the emitters.
-    pinMode(pins::IR_LED_BANK_1_EN, OUTPUT);
-    pinMode(pins::IR_LED_BANK_2_EN, OUTPUT);
-    digitalWrite(pins::IR_LED_BANK_1_EN, LOW);
-    digitalWrite(pins::IR_LED_BANK_2_EN, LOW);
+    for (uint8_t b = 0; b < pins::NUM_LED_BANKS; b++) {
+        pinMode(pins::IR_LED_BANK_EN[b], OUTPUT);
+        digitalWrite(pins::IR_LED_BANK_EN[b], LOW);
+    }
 
     // The MCP23017 bus. There is only one bus now: the second I2C controller
     // used to run a permanent slave for the HiveScale, and that link is gone.
