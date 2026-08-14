@@ -32,9 +32,17 @@ namespace beecounter_proto {
 // uses this only to understand the document it is parsing.
 //
 // v2 = the last wired revision (it numbered an OTA-over-I2C register block).
-//      The value is kept rather than reset so a HiveHub that has seen both
+//      The value was kept rather than reset so a HiveHub that has seen both
 //      generations never sees the format revision go backwards.
-constexpr uint8_t PROTOCOL_VERSION = 2;
+// v3 = uptime_s and glitches widened to 32 bits, and "gates_healthy" renamed to
+//      "mcps_healthy" to say what it has always counted. See the revision
+//      history in docs/ble-mode.md for the full delta.
+//
+// A counter in the field keeps emitting v2 until it is updated over the air,
+// and the OTA relay has to read this very characteristic before it can update
+// anything — so HiveHub's parser reads "fw" first and accepts both revisions.
+// Its tolerant parser must be deployed BEFORE any counter emitting v3.
+constexpr uint8_t PROTOCOL_VERSION = 3;
 
 // --------------------------------------------------------------------------
 // Status bitfield — reported as the JSON "status" field

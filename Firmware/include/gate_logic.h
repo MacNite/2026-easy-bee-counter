@@ -224,15 +224,11 @@ inline bool countSaturating(volatile uint32_t& total) {
     return total == UINT32_MAX;
 }
 
-// Same, for the 16-bit diagnostic glitch tally. A noisy or failed sensor used
-// to wrap this every 65,536 events, which made a badly unhealthy device look
-// like it had fewer glitches than the previous reading. Pinning at the maximum
-// is unambiguous; widening the field is a wire-format change (see the note in
-// docs/ble-mode.md).
-inline bool countSaturating(volatile uint16_t& total) {
-    if (total == UINT16_MAX) return true;
-    total = total + 1;
-    return total == UINT16_MAX;
-}
+// The diagnostic glitch tally uses the same 32-bit counter as of protocol v3.
+// It was a uint16_t that first wrapped every 65,536 events — making a badly
+// unhealthy device look like it had FEWER glitches than on the previous read —
+// and then, once saturating, pinned at 65535, which a noisy device can reach in
+// a day. Widening it needed HiveHub's parser to change in step, so it happened
+// as part of the v3 revision rather than on the counter alone.
 
 }  // namespace gatelogic
