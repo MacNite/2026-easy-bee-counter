@@ -40,7 +40,10 @@
 //      module's RF antenna switch, so using it also disturbs the radio.
 //
 // Always write the GPIO number here, never the silk number. The PlatformIO
-// board is esp32-c6-devkitc-1, whose variant defines no D-aliases at all.
+// board is seeed_xiao_esp32c6; its XIAO_ESP32C6 variant does define the
+// D0..D10 aliases above, but it does not enable the core's pin remapping
+// (BOARD_HAS_PIN_REMAP), so an Arduino pin number is still a raw GPIO number
+// and the constants below are read literally.
 //
 // I2C bus layout
 // --------------

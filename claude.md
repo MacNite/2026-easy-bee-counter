@@ -38,7 +38,7 @@ backend.
 
 ### Layout
 
-- `Firmware/` — PlatformIO project for the ESP32-C6 (`board = esp32-c6-devkitc-1`).
+- `Firmware/` — PlatformIO project for the ESP32-C6 (`board = seeed_xiao_esp32c6`).
   - `src/main.cpp` — MCP polling loop, per-gate debounce/direction state machine,
     pulsed IR emitter control, and the `-DIR_DEBUG` serial console.
   - `src/ble_link.cpp` — NimBLE GATT peripheral: the measurement characteristic
@@ -60,10 +60,11 @@ backend.
 
 ### Things to know before changing firmware
 
-- **Two build environments**, both in `Firmware/platformio.ini`:
-  `esp32-c6-devkitc-1` (production) and `esp32-c6-devkitc-1-irdebug` (adds the
-  interactive IR sensor console). The debug console is gated behind `-DIR_DEBUG`
-  and must never end up in the production build.
+- **One build environment** in `Firmware/platformio.ini`: `seeed_xiao_esp32c6`
+  (production). The interactive IR sensor console in `main.cpp` is gated behind
+  `-DIR_DEBUG`, has no environment of its own, and must never end up in the
+  production build; compile it ad hoc with
+  `PLATFORMIO_BUILD_FLAGS=-DIR_DEBUG pio run`.
 - **Bump `HIVETRAFFIC_FW_VERSION` in `include/version.h` for every released
   image.** HiveHub refuses an OTA relay that isn't newer, and uses the same
   field afterwards to confirm the update took.

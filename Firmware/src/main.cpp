@@ -400,8 +400,9 @@ static bool pollAllGates() {
 // A tiny interactive console for bench bring-up: it lets you watch the raw
 // inner/outer beam state of all 24 gates over the USB CDC serial link without
 // any HiveScale / I2C master attached. It is intentionally excluded from the
-// production build — none of this code is compiled unless -DIR_DEBUG is set
-// (see the esp32-c6-devkitc-1-irdebug env in platformio.ini).
+// production build — none of this code is compiled unless -DIR_DEBUG is set.
+// No PlatformIO environment defines it; build the console ad hoc with
+//     PLATFORMIO_BUILD_FLAGS=-DIR_DEBUG pio run -t upload
 //
 // Commands (single keypress in the serial monitor):
 //   r  read & print every gate's sensors once

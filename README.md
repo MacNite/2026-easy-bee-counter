@@ -343,7 +343,7 @@ reboot). Gate counting pauses for the duration. See
 
 ## 8. Firmware Summary
 
-Implemented in `Firmware/` (PlatformIO, `esp32-c6-devkitc-1` env). See
+Implemented in `Firmware/` (PlatformIO, `seeed_xiao_esp32c6` env). See
 `Firmware/README.md` for build/flash and tuning details.
 
 ### ESP32-C6 (bee counter)
