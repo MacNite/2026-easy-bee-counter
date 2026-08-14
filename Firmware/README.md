@@ -49,8 +49,8 @@ The 48 sensor lines are read through 3 MCP23017 I2C port expanders:
 
 The IR emitters are split into two banks driven by IRLB8721 N-channel MOSFETs:
 
-- **LED_BANK_1** — gates 00..13, FET driven by ESP32-C6 GPIO8 (silk "D8")
-- **LED_BANK_2** — gates 14..27, FET driven by ESP32-C6 GPIO9 (silk "D9")
+- **LED_BANK_1** — gates 00..13, FET driven by GPIO19 (XIAO silk "D8")
+- **LED_BANK_2** — gates 14..27, FET driven by GPIO20 (XIAO silk "D9")
 
 Driving the GPIO HIGH turns the bank's emitters on. In the default `LedMode::AUTO` the emitters are **pulsed**: both banks are lit only for the settle + MCP-read window of each poll (~1.75 ms at 100 kHz), then switched off until the next poll. This drops the emitter duty cycle from 100% to roughly 35% at  the default 5 ms poll interval, cutting average emitter current proportionally, with no change to detection behaviour. The IR_DEBUG console's `1` / `0` / `a` keys force steady-on, blackout and pulsed mode respectively for bench work.
 
@@ -70,11 +70,11 @@ ever blocks before timeout) are counted and reported as the JSON `glitches` fiel
 
 ### One I2C bus
 
-The MCP23017s sit on `Wire` (GPIO4 = SDA, GPIO5 = SCL), with the on-board 4.7 kΩ
+The MCP23017s sit on `Wire` (GPIO22 / silk D4 = SDA, GPIO23 / silk D5 = SCL), with the on-board 4.7 kΩ
 pull-ups R4/R5. The loop polls them on a ~5 ms cadence and nothing else shares
 the bus, so there is no arbitration to think about.
 
-The PCB also routes a second bus to J1 on GPIO2/GPIO3 for the retired HiveScale
+The PCB also routes a second bus to J1 on silk D2/D3 (GPIO2/GPIO21) for the retired HiveScale
 link. The firmware never initialises that controller, so those pins stay inputs.
 
 ### Reporting
@@ -99,9 +99,13 @@ pio run -t upload     # flash via USB
 pio device monitor    # 115200 baud serial output
 ```
 
-PlatformIO target is `esp32-c6-devkitc-1`, the right board profile for the
-ESP32-C6-MINI-1 module on this PCB. USB CDC is enabled in `platformio.ini`, so
-`Serial` output comes out over USB without an external UART bridge.
+PlatformIO target is `esp32-c6-devkitc-1`. U5 on this PCB is a **Seeed XIAO
+ESP32C6** (Seeed part 113991054), not a bare ESP32-C6-MINI-1; the devkit profile
+is used because the firmware names every pin by raw GPIO number in `pins.h`
+rather than by the XIAO's `D0..D10` aliases. Do not read the board's silk
+numbers as GPIO numbers — they differ (silk D4 is GPIO22). USB CDC is enabled in
+`platformio.ini`, so `Serial` output comes out over USB without an external UART
+bridge.
 
 The build uses `partitions_4mb_ota_no_fs.csv` — two 2 MB app slots so BLE OTA
 can write the inactive one. A counter still running a pre-BLE image was flashed

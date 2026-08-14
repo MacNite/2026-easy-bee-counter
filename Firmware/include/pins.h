@@ -8,32 +8,48 @@
 //
 // ESP32-C6 mini silk-label -> GPIO mapping
 // ----------------------------------------
-// The board exposes silk labels D0..D10 + TX_D6/RX_D7 that correspond to:
+// U5 is a Seeed XIAO ESP32C6 (schematic symbol "ESP32 C6 mini", Seeed part
+// 113991054), NOT a bare ESP32-C6-MINI-1 module. That distinction is the whole
+// reason this table exists: on the XIAO form factor the silk labels D0..D10 do
+// *not* equal the GPIO numbers. The authority is the Arduino core variant
+// header variants/XIAO_ESP32C6/pins_arduino.h:
+//
+//   silk   GPIO   net on this PCB
+//   ----   ----   ---------------------------------------------------------
 //   D0  -> GPIO0
 //   D1  -> GPIO1
-//   D2  -> GPIO2     <-- SDA_HiveScale (unused: the wired link was removed)
-//   D3  -> GPIO3     <-- SCL_HiveScale (unused: the wired link was removed)
-//   D4  -> GPIO4     <-- /SDA   (I2C data, MCP23017 master bus)
-//   D5  -> GPIO5     <-- /SDC   (I2C clock, schematic spells it "SDC")
-//   D6  -> GPIO6     <-- TX (UART0)            [unused on this board]
-//   D7  -> GPIO7     <-- RX (UART0)            [unused on this board]
-//   D8  -> GPIO8     <-- /GPIO4 net -> Q1 gate (LED_BANK_1 enable, gates 00..13)
-//   D9  -> GPIO9     <-- /GPIO5 net -> Q2 gate (LED_BANK_2 enable, gates 14..27)
-//   D10 -> GPIO10                                [unused on this board]
+//   D2  -> GPIO2   SDA_HiveScale (unused: the wired link was removed)
+//   D3  -> GPIO21  SCL_HiveScale (unused: the wired link was removed)
+//   D4  -> GPIO22  /SDA   (I2C data, MCP23017 master bus)
+//   D5  -> GPIO23  /SDC   (I2C clock, schematic spells it "SDC")
+//   D6  -> GPIO16  TX (UART0)                    [unused on this board]
+//   D7  -> GPIO17  RX (UART0)                    [unused on this board]
+//   D8  -> GPIO19  /GPIO4 net -> Q1 gate (LED_BANK_1 enable, gates 00..13)
+//   D9  -> GPIO20  /GPIO5 net -> Q2 gate (LED_BANK_2 enable, gates 14..27)
+//   D10 -> GPIO18                                [unused on this board]
 //
-// The schematic net labels "/GPIO4" and "/GPIO5" do NOT mean physical GPIO4/5 —
-// they were just net names. Physically they connect to U5 pins 9 and 10 which
-// are silk-labelled D8 and D9, i.e. GPIO8 and GPIO9. Confusing but real.
+// Two traps live in that table, and this firmware fell into both:
+//
+//   1. The schematic net labels "/GPIO4" and "/GPIO5" do NOT mean physical
+//      GPIO4/GPIO5 — they are just net names. Physically they land on U5 pins
+//      9 and 10, silk-labelled D8 and D9, i.e. GPIO19 and GPIO20.
+//   2. GPIO3..GPIO15 are simply not on the XIAO header. Assigning a bus to one
+//      of them compiles and boots happily, drives nothing, and every device on
+//      the real bus reports NOT FOUND. GPIO3 in particular is tied to the
+//      module's RF antenna switch, so using it also disturbs the radio.
+//
+// Always write the GPIO number here, never the silk number. The PlatformIO
+// board is esp32-c6-devkitc-1, whose variant defines no D-aliases at all.
 //
 // I2C bus layout
 // --------------
-//   Bus 0 (Wire) — MASTER, GPIO4 (SDA) / GPIO5 (SCL). Talks to the 3x MCP23017
-//                  port expanders. On-board pull-ups R4/R5 (4.7k each).
+//   Bus 0 (Wire) — MASTER, GPIO22/D4 (SDA) / GPIO23/D5 (SCL). Talks to the 3x
+//                  MCP23017 port expanders. On-board pull-ups R4/R5 (4.7k each).
 //
-// The PCB also routes a second bus to J1 on GPIO2/GPIO3, which earlier firmware
-// ran as a permanent I2C slave for a HiveScale. That link is gone: the counter
-// reports over BLE only. The pads and traces are harmless — the firmware simply
-// never brings up the second controller, so the pins stay inputs.
+// The PCB also routes a second bus to J1 on D2/D3 (GPIO2/GPIO21), which earlier
+// firmware ran as a permanent I2C slave for a HiveScale. That link is gone: the
+// counter reports over BLE only. The pads and traces are harmless — the firmware
+// simply never brings up the second controller, so the pins stay inputs.
 //
 // MCP23017 addresses (set by A0/A1/A2 strap pins, base 0x20):
 //   U2 -> A0=0 A1=0 A2=0 -> 0x20  (gates 00..07)
@@ -80,11 +96,11 @@
 namespace pins {
 
 // Bus 0 (Wire) — master to the MCP23017s.
-constexpr int I2C_SDA           = 2;   // U5 D4 / silk "D4" -> /SDA net
-constexpr int I2C_SCL           = 3;   // U5 D5 / silk "D5" -> /SDC net
+constexpr int I2C_SDA           = 22;   // U5 pin 5  / silk "D4" -> /SDA net
+constexpr int I2C_SCL           = 23;   // U5 pin 6  / silk "D5" -> /SDC net
 
-constexpr int IR_LED_BANK_1_EN  = 18;   // U5 D8 / silk "D8" -> Q1 gate -> gates 00..13
-constexpr int IR_LED_BANK_2_EN  = 19;   // U5 D9 / silk "D9" -> Q2 gate -> gates 14..27
+constexpr int IR_LED_BANK_1_EN  = 19;   // U5 pin 9  / silk "D8" -> Q1 gate -> gates 00..13
+constexpr int IR_LED_BANK_2_EN  = 20;   // U5 pin 10 / silk "D9" -> Q2 gate -> gates 14..27
 
 }  // namespace pins
 
