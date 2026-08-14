@@ -39,13 +39,21 @@ constexpr uint8_t PROTOCOL_VERSION = 2;
 // --------------------------------------------------------------------------
 // Status bitfield — reported as the JSON "status" field
 // --------------------------------------------------------------------------
+// The three MCP bits track LIVE health, not boot-time discovery: a chip that
+// stops answering clears its bit within MCP_FAIL_THRESHOLD polls, and one that
+// starts answering again (or was missing at boot) sets it on the next
+// successful re-probe. A cleared bit means that chip's eight gates are not
+// being counted at all — they are skipped rather than read as all-blocked.
 constexpr uint8_t STATUS_READY              = 0x01;   // boot complete, polling
 constexpr uint8_t STATUS_MCP_U2_OK          = 0x02;
 constexpr uint8_t STATUS_MCP_U3_OK          = 0x04;
 constexpr uint8_t STATUS_MCP_U4_OK          = 0x08;
 constexpr uint8_t STATUS_IR_LEDS_ON         = 0x10;
 constexpr uint8_t STATUS_SENSOR_FAULT_FLAG  = 0x20;   // a gate is stuck low/high
-constexpr uint8_t STATUS_OVERFLOW_FLAG      = 0x40;   // a totals counter wrapped
+// A lifetime total has reached UINT32_MAX. The counters saturate rather than
+// wrap, so the reported value stays pinned at the maximum and stays monotonic;
+// this flag is what distinguishes "pinned" from "stopped counting".
+constexpr uint8_t STATUS_OVERFLOW_FLAG      = 0x40;
 
 // --------------------------------------------------------------------------
 // OTA state machine — byte 0 of the OTA status characteristic

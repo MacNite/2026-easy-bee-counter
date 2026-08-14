@@ -196,16 +196,76 @@ All the knobs are at the top of `src/main.cpp`:
 | Constant                  | Default | Effect                                                        |
 | ------------------------- | ------- | ------------------------------------------------------------- |
 | `POLL_INTERVAL_MS`        | 5       | How often the MCP23017s are polled for crossings              |
-| `SENSOR_DEBOUNCE_MS`      | 3       | Minimum stable time before a sensor state change counts       |
+| `SENSOR_DEBOUNCE_MS`      | 5       | Minimum time a new sensor value must persist before it is accepted |
+| `SENSOR_DEBOUNCE_SAMPLES` | 2       | Consecutive polls that must agree before a change is accepted |
 | `GATE_PAIRING_WINDOW_MS`  | 2000    | Max time between inner/outer trip for a directional count     |
 | `SENSOR_STUCK_MS`         | 30000   | After this many ms continuously blocked, fault flag is raised |
+| `MCP_FAIL_THRESHOLD`      | 3       | Consecutive failed reads before a chip is declared unhealthy  |
+| `MCP_RETRY_INTERVAL_MS`   | 5000    | How often an unhealthy chip is re-probed                      |
 | `I2C_MASTER_HZ`           | 400000  | MCP bus clock; reduces every pulsed sample's IR-on and CPU-wait time |
 | `LED_SETTLE_US`           | 250     | IR emitter settle time before each pulsed read. Lower = less power but risks reading stale "clear" levels if shorter than the real phototransistor settle time. |
 
-
 If your hive has unusually long entrance tunnels or slow-moving bees, raise
-`GATE_PAIRING_WINDOW_MS`. If you see noise events on `GLITCH_COUNT`, raise
-`SENSOR_DEBOUNCE_MS`.
+`GATE_PAIRING_WINDOW_MS`.
+
+### The debounce rule
+
+A sensor change is accepted only once the new value has been seen on
+`SENSOR_DEBOUNCE_SAMPLES` **consecutive** polls *and* has persisted for at least
+`SENSOR_DEBOUNCE_MS`. Both halves matter, and they interact with
+`POLL_INTERVAL_MS`:
+
+- A `SENSOR_DEBOUNCE_MS` shorter than one poll period cannot reject anything —
+  the first differing sample already satisfies it. At the 5 ms poll rate the
+  sample count is the half that actually does the work.
+- `SENSOR_DEBOUNCE_SAMPLES = 2` is the practical ceiling. A bee crossing at
+  ~25 cm/s dwells ~12 ms in a 3 mm beam, i.e. 2-3 samples; requiring three
+  agreeing samples (~10 ms) would start dropping real crossings. Two rejects a
+  single corrupted or noisy word while accepting a genuine block ~5 ms after it
+  appears.
+
+So if you see noise on `glitches`, do **not** simply raise
+`SENSOR_DEBOUNCE_SAMPLES` — poll faster first (lower `POLL_INTERVAL_MS`, at the
+cost of emitter duty cycle) so a longer debounce still fits inside the dwell.
+
+The rules live in `include/gate_logic.h` and are covered by the host-side tests
+described under [Tests](#tests).
+
+### Expander health
+
+Each MCP23017 is tracked at runtime rather than only at boot:
+
+- A chip that fails `MCP_FAIL_THRESHOLD` consecutive reads is marked unhealthy,
+  its `STATUS_MCP_U*_OK` status bit is cleared, and its eight gates are reset
+  and skipped. Gates are skipped from the *first* failed read — a failed I2C
+  transaction reads as `0x0000`, which is indistinguishable from "all 16 beams
+  blocked", so it must never reach the state machine.
+- An unhealthy chip (including one missing at boot) is re-probed every
+  `MCP_RETRY_INTERVAL_MS`, with the emitters dark so a probe never lengthens the
+  LED pulse. On recovery its gates are reset and its status bit is set again.
+- `gates_healthy` in the BLE telemetry reflects this live state.
+
+---
+
+## Tests
+
+The counting logic — sensor debounce, the per-gate direction state machine and
+the saturating counters — lives in `include/gate_logic.h`, deliberately free of
+Arduino, I2C and hardware dependencies so it can be run on a host compiler:
+
+```
+./test/run_tests.sh
+```
+
+No ESP32, no MCP23017 and no bee required. The suite covers single-sample
+spikes, alternating noise, simultaneous transitions, minimum-dwell and repeated
+crossings, pairing-window expiry, stuck sensors, `millis()` rollover and counter
+saturation. Everything hardware-facing stays in `src/main.cpp` and is still
+verified on the bench with the IR-sensor console above.
+
+Run it before pushing a change to the timing rules: the failure it was written
+to catch (a debounce that accepted the first differing sample) is invisible in a
+code read and effectively untestable on a live hive.
 
 ---
 
@@ -225,7 +285,10 @@ Easy Bee Counter 2026 — firmware booting (BLE/GATT link)
 [SETUP] Entering normal counting loop (pulsed IR)
 ```
 
-If any MCP shows `NOT FOUND`, check:
+A chip that shows `NOT FOUND` is not written off: the firmware re-probes it
+every `MCP_RETRY_INTERVAL_MS` and logs `recovered` if it starts answering, so a
+marginal connection can come back without a power cycle. Its eight gates are
+skipped (not counted as blocked) while it is down. If it never recovers, check:
 
 - That the A0/A1/A2 strap pins of that chip are connected as the schematic
   says (U2=0x20: all GND; U3=0x21: A0→3V3; U4=0x22: A1→3V3).
