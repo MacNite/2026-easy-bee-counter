@@ -16,6 +16,30 @@
 // or via test/run_tests.sh, which builds every host test.
 // ============================================================================
 
+// ---------------------------------------------------------------------------
+// Arduino's macro soup, reproduced before the include on purpose.
+// ---------------------------------------------------------------------------
+// idle_state.h and counter_protocol.h are built two ways: here, against a bare
+// host compiler, and in the firmware, after Arduino.h has defined a few hundred
+// all-caps macros. The second is far more hostile, and a test that only sees
+// the first cannot catch a name collision — HiveHub hit exactly that, where an
+// enumerator named DISABLED met esp32-hal-gpio.h's `#define DISABLED 0x00` and
+// broke the build while every host check passed.
+//
+// So define the ones that actually bite, with their real Arduino values, before
+// the include. Any constant added to the shared protocol header that strays
+// into the all-caps macro namespace now fails on a host compiler in seconds
+// rather than partway through a firmware build. Deliberately NOT #undef'd.
+#define DISABLED 0x00
+#define INPUT 0x01
+#define OUTPUT 0x03
+#define PULLUP 0x04
+#define PULLDOWN 0x08
+#define HIGH 0x1
+#define LOW 0x0
+#define ANALOG 0xC0
+#define OPEN_DRAIN 0x10
+
 #include "idle_state.h"
 
 #include <cstdio>
