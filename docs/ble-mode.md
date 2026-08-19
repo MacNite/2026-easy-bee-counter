@@ -24,17 +24,19 @@ advertises as `BeeCounter`, but HiveHub connects by the paired MAC.
 | Service | `8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
 | Measurement characteristic | `8e8b0102-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
 | Properties | READ |
+| Control characteristic (night mode) | `8e8b0103-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
+| Properties | READ, WRITE |
 
 The value is generated when HiveHub reads it, so it contains current lifetime
 totals rather than a periodically cached snapshot:
 
 ```json
-{"fw":3,"ver":"0.1.0","uptime_s":1234,"status":15,"num_gates":24,"mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2}
+{"fw":4,"ver":"0.2.0","uptime_s":1234,"status":15,"num_gates":24,"mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2,"idle_s":0}
 ```
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `fw` | uint8 | Revision of *this document's* format (`PROTOCOL_VERSION`), currently 3 |
+| `fw` | uint8 | Revision of *this document's* format (`PROTOCOL_VERSION`), currently 4 |
 | `ver` | string | Image version from `include/version.h`, `MAJOR.MINOR.PATCH` |
 | `uptime_s` | uint32 | Seconds since boot |
 | `status` | uint8 | Status bitfield, see `include/counter_protocol.h` |
@@ -42,6 +44,7 @@ totals rather than a periodically cached snapshot:
 | `mcps_healthy` | uint8 | MCP23017 expanders currently answering, 0..3 — **not** gates |
 | `total_in` / `total_out` | uint32 | Monotonic lifetime totals, saturating |
 | `glitches` | uint32 | Diagnostic tally of ambiguous/aborted pairings, saturating |
+| `idle_s` | uint32 | Seconds of night-mode suspension still to run; `0` while counting |
 
 The field names, UUIDs, and integer types match HiveHub's
 `firmware/include/bee_counter_wire.h` parser, which reads `fw` first and
@@ -145,8 +148,95 @@ without validating missed-crossing rates on assembled entrance hardware.
 * Lifetime totals are held in RAM. HiveHub recognizes a backwards total after
   reboot as a reset, but traffic before the first successful post-reboot read
   cannot be reconstructed.
-* Reflective sensors require continuous sampling, so deep sleep is incompatible
-  with uninterrupted counting.
+* Reflective sensors require continuous sampling, so **uninterrupted** counting
+  and sleep are incompatible. Night mode (below) is the deliberate exception:
+  it stops counting on purpose, during hours when there is nothing to count, and
+  says so in the document.
+
+## Night mode (the control characteristic)
+
+Sampling 24 gates costs almost nothing in CPU and almost everything in emitter
+current: 48 IR LEDs in 24 series pairs behind 22 R ballast, all lit together for
+the settle+read window of every 5 ms poll. That is roughly 0.5-1.0 A peak and,
+at the ~35 % duty the pulsed sampler runs, an average draw an order of magnitude
+above the ~18 mA the C6 and the three expanders draw between them. On an
+off-grid hive it is the entire power budget.
+
+European honey bees are diurnal. Flight requires light — they will not fly in
+darkness at any temperature — and stops below roughly 10 C regardless, so the
+emitters spend every night burning the largest item in the budget to count
+nothing. Night mode parks them.
+
+### What the counter knows, and what it does not
+
+**The counter never learns what time it is.** It has no RTC, no NVS and no
+network. HiveHub has all three (NTP plus a DS3231 at +/-2 ppm) and owns the
+schedule; the counter is told only *how long* to stay quiet:
+
+| Frame | Bytes |
+| --- | --- |
+| SET_IDLE | `0x01 + duration_s(4 LE)` |
+| RESUME | `0x02` |
+| Read-back | `state(1) + remaining_s(4 LE)`, state `0x00` sensing / `0x01` idle |
+
+A `SET_IDLE` of `0` means the same thing as `RESUME`, so HiveHub can cancel on a
+connection it already has without a second opcode.
+
+This is the whole design, and every property that matters falls out of it:
+
+* **It expires.** A HiveHub that crashes, loses power or is carried off cannot
+  leave a counter blind — the deadline runs out and sensing resumes. A stored
+  20:00-06:00 schedule would stay wrong until someone walked to the hive.
+* **It is bounded.** `MAX_IDLE_SECONDS` is one hour, several times HiveHub's
+  default 10-minute cycle. HiveHub re-arms every cycle for as long as its night
+  window lasts, so no single request ever has to cover a whole night, and the
+  counter's own clock only has to be right for one cycle at a time.
+* **A longer request is clamped, not refused.** Refusing would leave the
+  emitters running all night because one field was too large.
+* **It is never persisted.** Any reset — brownout, watchdog, OTA reboot — comes
+  back counting.
+* **It is refused during an OTA.** A transfer already parks the emitters and
+  pauses polling; the two mechanisms have no opinion about each other.
+
+The deadline arithmetic lives in `include/idle_state.h`, free of Arduino, and is
+pinned by `test/test_idle_state/` — including the `millis()` rollover and the
+"HiveHub stopped re-arming" case, neither of which is practical to reproduce on
+a hive.
+
+### Why not deep sleep
+
+Deep sleep was the obvious implementation and is the wrong one. It buys the
+residual ~18 mA on top of what parking the emitters already saves — under 10 %
+of the total — and costs:
+
+* the counter is **invisible** for 8-12 h: no measurement read, so every night
+  row carries `bee_counter.ok=false`;
+* **no OTA**, which contradicts the standing advice to relay firmware at night
+  (see HiveHub's `docs/hivetraffic-bee-counter.md`) because a transfer costs
+  counted bees;
+* **no cancelling** it once entered, however wrong the schedule turns out to be;
+* the lifetime totals live in RAM and would need moving into RTC memory;
+* `uptime_s` resets every morning, so every day looks like an unexplained reboot
+  — the one thing that field exists to reveal;
+* and the ESP32-C6's deep-sleep timer runs off the internal ~150 kHz RC
+  oscillator, which is strongly temperature-dependent. Over an 8-12 h sleep in a
+  hive that swings 10-25 C overnight, expect several minutes of drift and up to
+  ~30 minutes worst case. Re-arming a short window from HiveHub's DS3231 instead
+  means nothing accumulates and the worst-case error is one cycle.
+
+Staying awake keeps the counter readable, updatable and cancellable all night,
+for a few percent of the saving. If the residual current ever does matter, deep
+sleep belongs behind its own opcode, with the totals moved to `RTC_DATA_ATTR`
+first.
+
+### What a night looks like in the data
+
+`total_in` / `total_out` are frozen for the duration, so the differenced
+interval across the suspension is genuinely zero rather than missing. The
+`STATUS_NIGHT_IDLE` bit (`0x80`) and the `idle_s` countdown are what separate
+that from a counter whose emitter FETs have died — which produces an identical
+row of zeros and is otherwise indistinguishable until someone reads a week of
+totals.
 
 ## Firmware update over connectable BLE
 
@@ -254,7 +344,27 @@ before treating OTA as secure against a nearby active attacker.
 set, name, meaning or range of the reported fields changes; a firmware fix that
 reports the same fields bumps `ver` and leaves `fw` alone.
 
-### v3 — current
+### v4 — current
+
+Night mode. The counter can be told to stop sensing for a bounded period (see
+[Night mode](#night-mode-the-control-characteristic)), and the document now says
+when it has.
+
+| Change | v3 | v4 |
+| --- | --- | --- |
+| Suspension countdown | — | `idle_s` (uint32, seconds remaining, `0` while counting) |
+| `status` bit `0x80` | unused | `STATUS_NIGHT_IDLE` |
+| Control characteristic | — | `8e8b0103-…`, READ + WRITE |
+
+The addition is purely additive: v4 documents carry every v3 key unchanged, so a
+parser that skips unknown keys reads one correctly without knowing about night
+mode at all. HiveHub's `bee_counter_wire.h` does exactly that, which is why the
+usual deployment-order rule is a formality here rather than a hazard — but it
+still applies, because a HiveHub that does not understand `idle_s` cannot tell a
+suspended counter from a broken one, and it is HiveHub that decides when to
+suspend.
+
+### v3
 
 Three contract-level defects that could not be fixed on the counter alone,
 fixed together so the fleet needs one coordinated deployment rather than three.
@@ -264,6 +374,7 @@ fixed together so the fleet needs one coordinated deployment rather than three.
 | `uptime_s` | `uint16_t`, clamped at 65535 (18 h 12 min) | `uint32_t`, no clamp |
 | `glitches` | `uint16_t`, saturating at 65535 | `uint32_t`, saturating at 4294967295 |
 | MCP health field | `gates_healthy` | `mcps_healthy` (same 0..3 value) |
+
 
 The rename carries no change in meaning: the field counted MCP23017 expanders
 in v2 as well. What changed is that the name no longer claims otherwise —
@@ -293,10 +404,14 @@ These are contract-level issues that cannot be fixed on the counter alone —
 each needs HiveHub's parser to change in step, so they are deliberately left
 alone until both sides can be revised together.
 
-* **The OTA service has no authentication.** There is no pairing, no
+* **The GATT service has no authentication.** There is no pairing, no
   authorization and no firmware signature check: CRC-32 is an integrity check,
   not an authenticity one, so anyone in radio range can push a validly-framed
-  image. This is an accepted, documented risk rather than an oversight, but
+  image — and, since v4, write a `SET_IDLE` and stop the counter for up to an
+  hour. The second is strictly the lesser of the two (it expires by itself, it
+  changes nothing persistent, and anyone able to do it could already replace the
+  firmware), but it is a new way to deny counting and it is named here rather
+  than left to be discovered. This is an accepted, documented risk rather than an oversight, but
   closing it needs a design decision (Secure Boot + signed images vs. a
   BLE-layer authentication handshake vs. a per-device provisioning key) *and* a
   migration story for counters already in the field, since an unauthenticated

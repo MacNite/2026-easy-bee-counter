@@ -41,8 +41,9 @@ backend.
 - `Firmware/` — PlatformIO project for the ESP32-C6 (`board = seeed_xiao_esp32c6`).
   - `src/main.cpp` — MCP polling loop, per-gate debounce/direction state machine,
     pulsed IR emitter control, and the `-DIR_DEBUG` serial console.
-  - `src/ble_link.cpp` — NimBLE GATT peripheral: the measurement characteristic
-    and the OTA characteristics.
+  - `src/ble_link.cpp` — NimBLE GATT peripheral: the measurement characteristic,
+    the night-mode control characteristic and the OTA characteristics.
+  - `include/idle_state.h` — night-mode suspension as pure deadline arithmetic.
   - `include/pins.h` — **authoritative** GPIO map for the PCB.
   - `include/counter_protocol.h` — status bitfield + OTA state codes shared
     between `main.cpp` and `ble_link.cpp`.
@@ -68,6 +69,14 @@ backend.
 - **Bump `HIVETRAFFIC_FW_VERSION` in `include/version.h` for every released
   image.** HiveHub refuses an OTA relay that isn't newer, and uses the same
   field afterwards to confirm the update took.
+- **Night mode is a bounded duration, never a schedule.** The counter has no
+  clock and must never be given one: HiveHub writes "stop sensing for N
+  seconds", capped at `MAX_IDLE_SECONDS`, and re-arms it each cycle. Every
+  failure — a dead HiveHub, a malformed write, a reset — has to end with the
+  counter counting. Do not add persistence, and do not replace it with deep
+  sleep: the emitters are >90% of the draw, and sleeping costs the measurement
+  read, the OTA path and the RAM totals for the remainder. See
+  `docs/ble-mode.md`.
 - **The counter reports lifetime totals only** — no latch, no reset, no
   per-interval state on the device. HiveHub differences consecutive reads.
   This is deliberate: a missed connection can't lose traffic if nothing is

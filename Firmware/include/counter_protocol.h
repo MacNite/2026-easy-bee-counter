@@ -37,12 +37,17 @@ namespace beecounter_proto {
 // v3 = uptime_s and glitches widened to 32 bits, and "gates_healthy" renamed to
 //      "mcps_healthy" to say what it has always counted. See the revision
 //      history in docs/ble-mode.md for the full delta.
+// v4 = adds the "idle_s" field and the STATUS_NIGHT_IDLE bit, so a document
+//      says whether the counter is deliberately not sensing (night mode) and
+//      for how much longer. Without it a night of zero crossings is
+//      indistinguishable from a counter whose emitters have failed.
 //
-// A counter in the field keeps emitting v2 until it is updated over the air,
-// and the OTA relay has to read this very characteristic before it can update
-// anything — so HiveHub's parser reads "fw" first and accepts both revisions.
-// Its tolerant parser must be deployed BEFORE any counter emitting v3.
-constexpr uint8_t PROTOCOL_VERSION = 3;
+// A counter in the field keeps emitting an older revision until it is updated
+// over the air, and the OTA relay has to read this very characteristic before
+// it can update anything — so HiveHub's parser reads "fw" first and accepts
+// every revision. Its tolerant parser must be deployed BEFORE any counter
+// emitting the new one.
+constexpr uint8_t PROTOCOL_VERSION = 4;
 
 // --------------------------------------------------------------------------
 // Status bitfield — reported as the JSON "status" field
@@ -62,6 +67,12 @@ constexpr uint8_t STATUS_SENSOR_FAULT_FLAG  = 0x20;   // a gate is stuck low/hig
 // wrap, so the reported value stays pinned at the maximum and stays monotonic;
 // this flag is what distinguishes "pinned" from "stopped counting".
 constexpr uint8_t STATUS_OVERFLOW_FLAG      = 0x40;
+// Sensing is deliberately suspended (night mode): the emitters are dark, the
+// gates are not polled and the totals are frozen. This is the bit that keeps a
+// night of zero crossings from reading as a dead counter — see idle_state.h for
+// the deadline that clears it, and the control characteristic below for who
+// sets it.
+constexpr uint8_t STATUS_NIGHT_IDLE         = 0x80;
 
 // --------------------------------------------------------------------------
 // OTA state machine — byte 0 of the OTA status characteristic
@@ -80,5 +91,50 @@ constexpr uint8_t OTA_STATE_ERR_SIZE  = 0x14;   // received != declared size
 constexpr uint8_t OTA_STATE_ERR_END   = 0x15;   // Update.end() failed
 
 constexpr uint8_t OTA_ERR_NONE = 0x00;
+
+// --------------------------------------------------------------------------
+// Control characteristic — night mode / sensing suspension
+// --------------------------------------------------------------------------
+// The counter has never had an input other than OTA. This is the second one,
+// and it is deliberately the smallest thing that can express "stop sensing":
+// HiveHub writes a DURATION, never a schedule and never a wall-clock time.
+//
+// Why a deadline rather than a schedule
+// -------------------------------------
+// The counter has no RTC, no NVS and no idea what time it is; giving it a
+// 20:00-06:00 window would mean teaching it all three, and every one of them is
+// a way for a counter to end up permanently blind on its own. A duration cannot
+// do that: it expires. HiveHub knows the time (NTP + a DS3231 at +/-2 ppm) and
+// re-arms the idle window once per upload cycle, so the counter's own clock
+// only has to be right for one cycle at a time and nothing accumulates.
+//
+// Everything about this is fail-open. An idle request is capped at
+// MAX_IDLE_SECONDS; the state is never persisted, so any reset resumes
+// counting; and a HiveHub that stops calling simply lets the deadline run out.
+// The failure mode of the whole feature is "the counter counts", which is the
+// behaviour it had before this existed.
+constexpr uint8_t CTRL_OP_SET_IDLE = 0x01;   // + duration_s (4 LE)
+constexpr uint8_t CTRL_OP_RESUME   = 0x02;   // no payload: sense again now
+
+// Longest suspension the counter will accept, whatever HiveHub asks for. One
+// hour is several times HiveHub's default 10-minute upload cycle — enough that
+// a couple of missed cycles do not wake the emitters up in the middle of the
+// night — while bounding how long a counter can stay blind after HiveHub falls
+// off the air entirely. A longer request is CLAMPED to this rather than
+// refused: refusing would leave the emitters running all night because one
+// field was too large.
+constexpr uint32_t MAX_IDLE_SECONDS = 3600;
+
+// Control status, as read back from the control characteristic:
+//     state(1) + remaining_s(4 LE)
+// state is one of the two below; remaining_s is 0 unless idle.
+constexpr uint8_t CTRL_STATE_SENSING = 0x00;
+constexpr uint8_t CTRL_STATE_IDLE    = 0x01;
+
+// Bytes in that read-back value.
+constexpr uint8_t CTRL_STATUS_LENGTH = 5;
+
+// Bytes in a well-formed SET_IDLE write (opcode + uint32 LE).
+constexpr uint8_t CTRL_SET_IDLE_LENGTH = 5;
 
 }  // namespace beecounter_proto

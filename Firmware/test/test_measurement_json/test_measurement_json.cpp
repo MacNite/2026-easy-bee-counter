@@ -65,33 +65,67 @@ static ble::Telemetry nominal() {
     t.total_in         = 100;
     t.total_out        = 95;
     t.glitch_count     = 2;
+    t.idle_s           = 0;
     return t;
 }
 
 // --------------------------------------------------------------------------
 
 static void test_nominal_document() {
-    g_case = "nominal v3 document";
+    g_case = "nominal v4 document";
     char json[MEASUREMENT_JSON_CAPACITY];
     const int n = buildMeasurementJson(json, sizeof(json), nominal(), "0.1.0");
     CHECK(n > 0);
     CHECK(std::strcmp(
         json,
-        "{\"fw\":3,\"ver\":\"0.1.0\",\"uptime_s\":1234,\"status\":15,"
+        "{\"fw\":4,\"ver\":\"0.1.0\",\"uptime_s\":1234,\"status\":15,"
         "\"num_gates\":24,\"mcps_healthy\":3,\"total_in\":100,"
-        "\"total_out\":95,\"glitches\":2}") == 0);
+        "\"total_out\":95,\"glitches\":2,\"idle_s\":0}") == 0);
     CHECK(n == (int)std::strlen(json));
 }
 
-static void test_protocol_version_is_three() {
+static void test_protocol_version_is_four() {
     // The version byte is what HiveHub branches on. If this changes without the
     // parser learning the new revision, every counter goes unreadable.
     g_case = "fw is the protocol revision, not the image version";
-    CHECK(PROTOCOL_VERSION == 3);
+    CHECK(PROTOCOL_VERSION == 4);
     char json[MEASUREMENT_JSON_CAPACITY];
     buildMeasurementJson(json, sizeof(json), nominal(), "9.9.9");
-    containsField(json, "\"fw\":3");
+    containsField(json, "\"fw\":4");
     containsField(json, "\"ver\":\"9.9.9\"");
+}
+
+static void test_night_mode_is_visible_in_the_document() {
+    // The reason idle_s exists: without it, a night of zero crossings and a
+    // counter whose emitter FETs have died produce identical documents. The
+    // status bit and the countdown are the only things that separate them.
+    g_case = "a suspended counter says so";
+    ble::Telemetry t = nominal();
+    t.status_flags |= STATUS_NIGHT_IDLE;
+    t.idle_s = 754;
+    char json[MEASUREMENT_JSON_CAPACITY];
+    CHECK(buildMeasurementJson(json, sizeof(json), t, "0.2.0") > 0);
+    containsField(json, "\"idle_s\":754");
+    // 15 (ready + three expanders) | 0x80 = 143.
+    containsField(json, "\"status\":143");
+
+    // And a counting one reports the same fields, saying the opposite.
+    t = nominal();
+    CHECK(buildMeasurementJson(json, sizeof(json), t, "0.2.0") > 0);
+    containsField(json, "\"idle_s\":0");
+    containsField(json, "\"status\":15");
+}
+
+static void test_night_idle_bit_does_not_collide() {
+    // 0x80 was the last free bit in the status byte. If a future flag reuses
+    // it, a suspended counter and whatever that flag means become the same
+    // reading on the wire.
+    g_case = "STATUS_NIGHT_IDLE owns bit 7 alone";
+    CHECK(STATUS_NIGHT_IDLE == 0x80);
+    const uint8_t others = STATUS_READY | STATUS_MCP_U2_OK | STATUS_MCP_U3_OK |
+                           STATUS_MCP_U4_OK | STATUS_IR_LEDS_ON |
+                           STATUS_SENSOR_FAULT_FLAG | STATUS_OVERFLOW_FLAG;
+    CHECK((others & STATUS_NIGHT_IDLE) == 0);
 }
 
 static void test_uptime_past_the_old_ceiling() {
@@ -152,12 +186,13 @@ static void test_saturated_worst_case_fits_the_buffer() {
     t.total_in         = UINT32_MAX;
     t.total_out        = UINT32_MAX;
     t.glitch_count     = UINT32_MAX;
+    t.idle_s           = UINT32_MAX;
     char json[MEASUREMENT_JSON_CAPACITY];
     const int n = buildMeasurementJson(json, sizeof(json), t, "255.255.255-rc1");
     CHECK(n > 0);
     CHECK(n < (int)MEASUREMENT_JSON_CAPACITY);
     // Headroom, so a longer version string cannot silently start truncating.
-    CHECK(n <= 176);
+    CHECK(n <= 200);
     std::printf("  worst case is %d of %u bytes\n", n, MEASUREMENT_JSON_CAPACITY);
 }
 
@@ -185,7 +220,9 @@ static void test_missing_version_string() {
 int main() {
     std::printf("measurement_json tests\n");
     test_nominal_document();
-    test_protocol_version_is_three();
+    test_protocol_version_is_four();
+    test_night_mode_is_visible_in_the_document();
+    test_night_idle_bit_does_not_collide();
     test_uptime_past_the_old_ceiling();
     test_glitches_past_the_old_ceiling();
     test_healthy_count_is_named_for_what_it_counts();

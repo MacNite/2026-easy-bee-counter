@@ -25,9 +25,25 @@ struct Telemetry {
     uint32_t total_out;
     // 32-bit since protocol v3; saturating, never wrapping (gate_logic.h).
     uint32_t glitch_count;
+    // Seconds of night-mode suspension still to run, 0 when counting. New in
+    // protocol v4, alongside STATUS_NIGHT_IDLE. It is what lets HiveHub — and
+    // anyone reading the stored history later — tell "no bees flew" from "this
+    // counter was deliberately not looking", which the totals alone cannot say.
+    uint32_t idle_s;
 };
 
 void getTelemetry(Telemetry& out);
+
+// Apply a night-mode request written to the control characteristic.
+// Implemented in main.cpp, where the suspension state and the emitters live;
+// declared here because ble_link.cpp is what receives the write.
+// `duration_s` of 0 resumes sensing. Returns the duration actually granted
+// after clamping to beecounter_proto::MAX_IDLE_SECONDS.
+uint32_t applyIdleRequest(uint32_t duration_s);
+
+// Seconds of suspension left, for the control characteristic's read-back.
+uint32_t idleRemainingSeconds();
+
 void begin();
 bool isOtaActive();
 void loopOta();

@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**", "feature/**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # The pure headers — gate_logic.h, measurement_json.h, idle_state.h — carry
+  # the logic that is impractical to exercise on a hive: debounce timing, the
+  # exact bytes HiveHub parses, and night-mode deadlines across a millis()
+  # rollover. They need nothing but a host compiler, so there is no reason for
+  # them to run only on someone's laptop.
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and run host logic tests
+        run: ./Firmware/test/run_tests.sh
+
+  # The production image must compile from a clean dependency cache (every
+  # library is pinned in Firmware/platformio.ini), and the -DIR_DEBUG bench
+  # console must keep compiling too: it has no environment of its own, so
+  # nothing else would ever catch it going stale.
+  firmware-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install PlatformIO
+        run: pip install platformio
+      # The bench console runs first so the production image is what ends up in
+      # .pio/build for the upload below — an IR_DEBUG binary published as the
+      # release artifact would be flashable, plausible and wrong.
+      - name: Build the IR_DEBUG bench console
+        env:
+          PLATFORMIO_BUILD_FLAGS: -DIR_DEBUG
+        run: pio run
+        working-directory: Firmware
+      - name: Build production image
+        run: pio run
+        working-directory: Firmware
+      - name: Upload firmware image
+        uses: actions/upload-artifact@v4
+        with:
+          name: hivetraffic-esp32-c6
+          # rename_firmware.py names this hivetraffic_esp32-c6_<version>.bin,
+          # which is the name HiveHub's upload form parses; keep it as produced.
+          path: Firmware/.pio/build/seeed_xiao_esp32c6/hivetraffic_*.bin
+          if-no-files-found: error

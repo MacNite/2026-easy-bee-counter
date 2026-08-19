@@ -179,6 +179,7 @@ Press a single key in the serial monitor:
 | `1` | Force IR LEDs ON (steady)                                       |
 | `0` | Force IR LEDs OFF                                               |
 | `a` | IR LEDs AUTO (normal pulsed mode)                              |
+| `n` | Arm / clear a 60 s night-mode suspension (press again to resume) |
 | `h` | Show the command list                                          |
 
 Each reading lists the raw MCP23017 port words plus a per-gate `BLOCK`/`clear`
@@ -274,6 +275,13 @@ No ESP32, no MCP23017 and no bee required.
   document against the buffer it has to fit in. Run it before changing any
   reported field — and bump `PROTOCOL_VERSION` and update HiveHub's parser in
   the same revision when you do (see `docs/ble-mode.md`).
+* **`include/idle_state.h`** — the night-mode suspension deadline. The suite
+  covers clamping an over-long request, the `millis()` rollover, and the case
+  that matters most in the field: HiveHub stopping re-arming, after which the
+  counter has to free itself. A counter stuck suspended emits perfectly
+  well-formed documents full of zeros, which is indistinguishable from a spell
+  of bad weather until someone reads a week of totals — so none of this is
+  something a bench session would catch.
 
 Everything hardware-facing stays in `src/main.cpp` and is still verified on the
 bench with the IR-sensor console above.
