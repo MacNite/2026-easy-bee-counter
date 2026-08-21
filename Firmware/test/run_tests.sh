@@ -8,7 +8,10 @@
 #                                 machine, and the saturating counters;
 #   * include/measurement_json.h — the exact bytes of the BLE measurement
 #                                 characteristic, i.e. HiveHub's half of the
-#                                 wire contract.
+#                                 wire contract;
+#   * include/idle_state.h      — the night-mode suspension deadline, including
+#                                 the millis() rollover and the "HiveHub stopped
+#                                 re-arming" case.
 #
 # Everything hardware-facing stays in src/main.cpp and is still verified on the
 # bench (see the IR_DEBUG console in the README).
@@ -37,3 +40,10 @@ trap 'rm -rf "$OUT"' EXIT
     -o "$OUT/test_measurement_json"
 
 "$OUT/test_measurement_json"
+
+"$CXX" -std=c++11 -Wall -Wextra -Werror \
+    -I include \
+    test/test_idle_state/test_idle_state.cpp \
+    -o "$OUT/test_idle_state"
+
+"$OUT/test_idle_state"

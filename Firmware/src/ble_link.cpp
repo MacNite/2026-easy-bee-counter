@@ -16,6 +16,12 @@ namespace {
 constexpr char BLE_DEVICE_NAME[] = "BeeCounter";
 constexpr char SVC_BEECOUNTER[] = "8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01";
 constexpr char CHR_MEASUREMENT[] = "8e8b0102-7a1c-4b9e-9a2f-1d6e0b9c1a01";
+// Night mode: HiveHub writes a suspension DURATION here, and reads back the
+// current state. Deliberately a separate characteristic from the OTA control
+// one — an image transfer and "stop sensing for a while" have nothing in
+// common but a direction, and sharing an opcode space between them would mean
+// a malformed OTA frame could suspend counting.
+constexpr char CHR_CONTROL[] = "8e8b0103-7a1c-4b9e-9a2f-1d6e0b9c1a01";
 constexpr char CHR_OTA_CTRL[] = "8e8b0110-7a1c-4b9e-9a2f-1d6e0b9c1a01";
 constexpr char CHR_OTA_DATA[] = "8e8b0111-7a1c-4b9e-9a2f-1d6e0b9c1a01";
 constexpr char CHR_OTA_STATUS[] = "8e8b0113-7a1c-4b9e-9a2f-1d6e0b9c1a01";
@@ -233,6 +239,79 @@ class OtaStatusCallbacks : public NimBLECharacteristicCallbacks {
     }
 };
 
+// Night-mode control. The parsing is intentionally strict: a write that is not
+// exactly a known opcode of the right length is ignored rather than guessed at,
+// because every misreading of this characteristic costs counted bees.
+class ControlCallbacks : public NimBLECharacteristicCallbacks {
+    void onWrite(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+        const NimBLEAttValue value = characteristic->getValue();
+        if (value.size() == 0) return;
+        const uint8_t* data = value.data();
+
+        switch (data[0]) {
+        case CTRL_OP_SET_IDLE: {
+            if (value.size() != CTRL_SET_IDLE_LENGTH) {
+                Serial.printf("[BLE-CTRL] SET_IDLE ignored: %u bytes, expected %u\n",
+                              (unsigned)value.size(),
+                              (unsigned)CTRL_SET_IDLE_LENGTH);
+                return;
+            }
+            // Refusing during an OTA is not caution, it is correctness: the
+            // transfer already parks the emitters and pauses polling, and a
+            // suspension armed underneath it would still be running when the
+            // counter reboots into the new image — except it would not, because
+            // the state is not persisted. Rejecting keeps the two mechanisms
+            // from having an opinion about each other at all.
+            if (isOtaActive()) {
+                Serial.println(F("[BLE-CTRL] SET_IDLE refused: OTA in progress"));
+                return;
+            }
+            const uint32_t duration_s =
+                (uint32_t)data[1] | ((uint32_t)data[2] << 8) |
+                ((uint32_t)data[3] << 16) | ((uint32_t)data[4] << 24);
+            const uint32_t granted = applyIdleRequest(duration_s);
+            if (granted != duration_s) {
+                Serial.printf("[BLE-CTRL] idle %lus requested, %lus granted (cap %lus)\n",
+                              (unsigned long)duration_s, (unsigned long)granted,
+                              (unsigned long)MAX_IDLE_SECONDS);
+            } else if (granted == 0) {
+                Serial.println(F("[BLE-CTRL] idle 0s: sensing resumed"));
+            } else {
+                Serial.printf("[BLE-CTRL] sensing suspended for %lus\n",
+                              (unsigned long)granted);
+            }
+            break;
+        }
+        case CTRL_OP_RESUME:
+            if (value.size() != 1) {
+                Serial.printf("[BLE-CTRL] RESUME ignored: %u bytes, expected 1\n",
+                              (unsigned)value.size());
+                return;
+            }
+            applyIdleRequest(0);
+            Serial.println(F("[BLE-CTRL] sensing resumed"));
+            break;
+        default:
+            Serial.printf("[BLE-CTRL] unknown opcode 0x%02X ignored\n",
+                          (unsigned)data[0]);
+            break;
+        }
+    }
+
+    // Built on read, like the measurement document, so a polling client always
+    // sees the live remaining time rather than whatever the last write left.
+    void onRead(NimBLECharacteristic* characteristic, NimBLEConnInfo&) override {
+        const uint32_t remaining = idleRemainingSeconds();
+        uint8_t value[CTRL_STATUS_LENGTH];
+        value[0] = remaining > 0 ? CTRL_STATE_IDLE : CTRL_STATE_SENSING;
+        value[1] = static_cast<uint8_t>(remaining);
+        value[2] = static_cast<uint8_t>(remaining >> 8);
+        value[3] = static_cast<uint8_t>(remaining >> 16);
+        value[4] = static_cast<uint8_t>(remaining >> 24);
+        characteristic->setValue(value, sizeof(value));
+    }
+};
+
 class ServerCallbacks : public NimBLEServerCallbacks {
     void onConnect(NimBLEServer*, NimBLEConnInfo&) override {
         Serial.println(F("[BLE] HiveHub connected"));
@@ -254,6 +333,7 @@ class ServerCallbacks : public NimBLEServerCallbacks {
 // deleteCallbacks argument is gone) and would have leaked. File-scope
 // singletons outlive the server by construction — they are stateless anyway.
 MeasurementCallbacks measurementCallbacks;
+ControlCallbacks controlCallbacks;
 OtaControlCallbacks otaControlCallbacks;
 OtaDataCallbacks otaDataCallbacks;
 OtaStatusCallbacks otaStatusCallbacks;
@@ -275,8 +355,12 @@ void begin() {
     refreshMeasurement(measurement);
 
     NimBLECharacteristic* control = service->createCharacteristic(
+        CHR_CONTROL, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE);
+    control->setCallbacks(&controlCallbacks);
+
+    NimBLECharacteristic* otaControl = service->createCharacteristic(
         CHR_OTA_CTRL, NIMBLE_PROPERTY::WRITE);
-    control->setCallbacks(&otaControlCallbacks);
+    otaControl->setCallbacks(&otaControlCallbacks);
     NimBLECharacteristic* payload = service->createCharacteristic(
         CHR_OTA_DATA, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
     payload->setCallbacks(&otaDataCallbacks);

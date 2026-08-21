@@ -26,6 +26,25 @@
 //      which differences consecutive reads into per-interval counts.
 //   4. Accepts a firmware image over the same GATT service (see ble_link.cpp),
 //      verifying size and CRC-32 before swapping app slots.
+//   5. Suspends 1-3 on request (night mode), so the emitters — which dominate
+//      this board's power draw by an order of magnitude — are dark through the
+//      hours European honey bees do not fly. See the section below.
+//
+// Night mode (protocol v4)
+// ------------------------
+// Honey bees are diurnal: flight needs light, and stops below roughly 10 C
+// regardless. Sampling 24 gates through the night therefore burns the largest
+// item in the power budget to count nothing. HiveHub — which knows the time,
+// and this board does not — writes a suspension DURATION to the control
+// characteristic once per upload cycle for as long as its configured night
+// window lasts; idle_state.h turns that into a deadline and this file stops
+// pulsing and polling until it expires.
+//
+// It is deliberately NOT deep sleep. The emitters are >90% of the draw, so
+// parking them captures essentially the whole saving, while staying awake keeps
+// the counter readable, updatable and cancellable all night — none of which
+// survives deep sleep — and keeps the lifetime totals in RAM where they belong.
+// See docs/ble-mode.md for the reasoning and the numbers.
 //
 // The wired HiveScale link is gone
 // --------------------------------
@@ -50,6 +69,7 @@
 #include "pins.h"
 #include "counter_protocol.h"
 #include "gate_logic.h"
+#include "idle_state.h"
 
 // The BLE/GATT transport: a connectable NimBLE GATT server serving the
 // measurement characteristic and the OTA characteristics. See ble_link.h.
@@ -181,6 +201,11 @@ static volatile uint32_t g_total_out = 0;
 // that said nothing about how bad things had got.
 static volatile uint32_t g_glitch_count  = 0;
 static volatile uint8_t  g_status_flags  = 0;
+
+// Night-mode suspension. Owned here because this is where the emitters and the
+// poll loop live; armed from the BLE control characteristic through
+// ble::applyIdleRequest() below. Never persisted: a reset resumes counting.
+static idlestate::State g_idle;
 
 // ============================================================================
 // MCP23017 channels + runtime health  (all on Wire / bus 0)
@@ -317,6 +342,17 @@ static void resetGatesForMcp(uint8_t addr) {
         if (gates::TABLE[i].mcp_address == addr) {
             g_gate_rt[i] = gatelogic::GateRuntime();
         }
+    }
+}
+
+// Drop every gate back to IDLE. Used on both edges of a night-mode suspension:
+// a gate that was half-way through a pairing when sensing stopped must not
+// combine that stale half with the first sample taken hours later and fabricate
+// a crossing. Same reasoning as resetGatesForMcp() across a chip outage — the
+// lifetime totals are untouched either way.
+static void resetAllGates() {
+    for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
+        g_gate_rt[i] = gatelogic::GateRuntime();
     }
 }
 
@@ -532,6 +568,7 @@ static bool pollAllGates() {
 //   1  force IR LEDs ON   (steady)
 //   0  force IR LEDs OFF
 //   a  IR LEDs AUTO       (normal pulsed mode)
+//   n  arm a 60 s night-mode suspension (press again to resume)
 //   h  print the command list
 // ============================================================================
 #ifdef IR_DEBUG
@@ -549,6 +586,7 @@ static void irDebugPrintHelp() {
     Serial.println(F("  1  force IR LEDs ON (steady)"));
     Serial.println(F("  0  force IR LEDs OFF"));
     Serial.println(F("  a  IR LEDs AUTO (pulsed, normal mode)"));
+    Serial.println(F("  n  arm/clear a 60 s night-mode suspension"));
     Serial.println(F("  h  show this help"));
     Serial.println();
 }
@@ -648,6 +686,17 @@ static void irDebugPoll() {
             setIrLeds(false);
             Serial.println(F("[IR-DEBUG] IR LEDs -> AUTO (pulsed)"));
             break;
+        case 'n': {
+            // Exercise the night-mode path without a HiveHub: 60 s is long
+            // enough to watch the emitters go dark and the counts freeze, short
+            // enough that a forgotten bench board resumes on its own.
+            const bool idle_now = !idlestate::sensing(g_idle);
+            const uint32_t granted = ble::applyIdleRequest(idle_now ? 0 : 60);
+            Serial.printf("[IR-DEBUG] night mode %s (%lus)\n",
+                          granted ? "ARMED" : "cleared",
+                          (unsigned long)granted);
+            break;
+        }
         case 'h':
         case '?':
             irDebugPrintHelp();
@@ -691,14 +740,56 @@ void getTelemetry(Telemetry& t) {
     for (uint8_t i = 0; i < NUM_MCP; i++) {
         if (g_mcp[i].ok) healthy++;
     }
+    // Derived here, not read straight out of g_status_flags, so the bit and the
+    // countdown can never disagree in a published document: the deadline can
+    // pass between a GATT read and the loop() pass that services the expiry,
+    // and "STATUS_NIGHT_IDLE set, idle_s 0" is a contradiction HiveHub would
+    // have to guess its way out of.
+    const uint32_t idle_left = idlestate::remainingSeconds(g_idle, millis());
+    const uint8_t status = idle_left
+        ? (uint8_t)(g_status_flags | beecounter_proto::STATUS_NIGHT_IDLE)
+        : (uint8_t)(g_status_flags & ~beecounter_proto::STATUS_NIGHT_IDLE);
+
     t.protocol_version = beecounter_proto::PROTOCOL_VERSION;
-    t.status_flags     = g_status_flags;
+    t.status_flags     = status;
     t.uptime_s         = up;
     t.num_gates        = gates::NUM_GATES;
     t.mcps_healthy     = healthy;
     t.total_in         = g_total_in;
     t.total_out        = g_total_out;
     t.glitch_count     = g_glitch_count;
+    t.idle_s           = idle_left;
+}
+
+uint32_t applyIdleRequest(uint32_t duration_s) {
+    const bool was_sensing = idlestate::sensing(g_idle);
+    const idlestate::Request r =
+        idlestate::request(g_idle, millis(), duration_s);
+
+    if (idlestate::sensing(g_idle)) {
+        // Resumed (or refused to start): clear the flag and drop any pairing
+        // state that predates the gap before the next poll can build on it.
+        if (!was_sensing) {
+            resetAllGates();
+            Serial.println(F("[IDLE] sensing resumed on request"));
+        }
+        g_status_flags &= (uint8_t)~beecounter_proto::STATUS_NIGHT_IDLE;
+    } else {
+        // Entering. Park the emitters immediately rather than waiting for the
+        // next poll to not run — the whole point of the feature is the current
+        // they draw. Re-arming an already-idle counter is the common case and
+        // must not reset the gates again: nothing has sampled in between.
+        if (was_sensing) {
+            resetAllGates();
+            driveIrLeds(false);
+        }
+        g_status_flags |= beecounter_proto::STATUS_NIGHT_IDLE;
+    }
+    return r.granted_s;
+}
+
+uint32_t idleRemainingSeconds() {
+    return idlestate::remainingSeconds(g_idle, millis());
 }
 
 }  // namespace ble
@@ -780,8 +871,37 @@ void loop() {
     // An OTA pauses sensing: flash writes must not leave an emitter pulse
     // active or corrupt a crossing in progress. Counting is deliberately
     // sacrificed for the duration of a transfer.
+    // Night mode ends on its own deadline, checked here rather than inside the
+    // poll branch so it still expires while an OTA is running — otherwise a
+    // relay that straddles sunrise would leave the counter suspended until the
+    // next HiveHub cycle re-armed or cleared it.
+    if (idlestate::serviceExpiry(g_idle, now)) {
+        // Nothing has sampled since the suspension began, so any pairing state
+        // still on a gate is hours stale.
+        resetAllGates();
+        g_status_flags &= (uint8_t)~beecounter_proto::STATUS_NIGHT_IDLE;
+        Serial.println(F("[IDLE] suspension expired; counting again"));
+    }
+
     if (ble::isOtaActive()) {
         driveIrLeds(false);
+    } else if (!idlestate::sensing(g_idle)) {
+        // Night mode: emitters dark, gates unpolled, totals frozen.
+        //
+        // The re-assert runs on the poll cadence rather than every loop pass.
+        // It is here as a backstop — applyIdleRequest() already parked the
+        // emitters on entry — so that nothing else (a FORCE_ON left set from a
+        // bench session, a future code path) can leave a bank lit through the
+        // night; doing it at full loop speed would spend the CPU cycles this
+        // mode exists to save.
+        if (now - g_last_poll_ms >= POLL_INTERVAL_MS) {
+            g_last_poll_ms = now;
+            driveIrLeds(false);
+        }
+        // Yield: with no gates to poll there is nothing here to be responsive
+        // to except BLE, which runs on its own task. A bare spin would burn the
+        // MCU's share of the budget for the whole night.
+        delay(1);
     } else if (now - g_last_poll_ms >= POLL_INTERVAL_MS) {
         g_last_poll_ms = now;
         pollAllGates();   // pulses the emitters internally in AUTO mode
@@ -793,7 +913,14 @@ void loop() {
     static LedMode last_led_mode = LedMode::AUTO;
     if (g_led_mode != last_led_mode) {
         last_led_mode = g_led_mode;
-        setIrLeds(true);   // setIrLeds() applies the mode-correct steady level
+        // Suspended: leave the emitters dark whatever the mode says. FORCE_ON
+        // exists for bench work and must not be able to undo night mode from a
+        // debug console that was left in that state.
+        if (idlestate::sensing(g_idle)) {
+            setIrLeds(true);   // setIrLeds() applies the mode-correct steady level
+        } else {
+            driveIrLeds(false);
+        }
     }
 
     // Periodic debug dump on serial -- once every 30 s.
@@ -802,12 +929,13 @@ void loop() {
         last_dump_ms = now;
         Serial.printf(
             "[STAT] uptime=%lus total_in=%lu total_out=%lu "
-            "glitches=%lu status=0x%02X\n",
+            "glitches=%lu status=0x%02X idle=%lus\n",
             (unsigned long)(now / 1000),
             (unsigned long)g_total_in,
             (unsigned long)g_total_out,
             (unsigned long)g_glitch_count,
-            (unsigned)g_status_flags
+            (unsigned)g_status_flags,
+            (unsigned long)idlestate::remainingSeconds(g_idle, now)
         );
     }
 }

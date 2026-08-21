@@ -12,7 +12,7 @@
 // beecounter_proto::PROTOCOL_VERSION. Keep the three in step: a field added
 // here is a field HiveHub's parser has to learn, in the same revision.
 //
-// snprintf rather than a JSON library: the document is a flat object of nine
+// snprintf rather than a JSON library: the document is a flat object of ten
 // fixed keys with no nesting, no arrays and no escaping to do, so there is
 // nothing for a parser-builder to buy us at the cost of heap churn on every
 // GATT read.
@@ -30,14 +30,14 @@ namespace beecounter_proto {
 
 // Buffer the measurement document must be built into.
 //
-// The worst case is protocol v3 with every field saturated and a long version
+// The worst case is protocol v4 with every field saturated and a long version
 // string. Counting the fixed punctuation and the maximum decimal widths:
 //
 //   {"fw":255,"ver":"<15>","uptime_s":4294967295,"status":255,"num_gates":255,
 //    "mcps_healthy":255,"total_in":4294967295,"total_out":4294967295,
-//    "glitches":4294967295}
+//    "glitches":4294967295,"idle_s":4294967295}
 //
-// is 171 bytes, plus the NUL — measured, not estimated, by
+// is 191 bytes, plus the NUL — measured, not estimated, by
 // test/test_measurement_json/ (which prints the number and fails if it grows
 // past the buffer). 224 leaves room for a version string longer than any
 // version.h has carried without another audit of this number; the truncation
@@ -45,7 +45,8 @@ namespace beecounter_proto {
 // document is never published, so this is headroom, not a promise.
 //
 // (v2 fitted in ~155 bytes. Widening uptime_s and glitches to 32 bits and
-// renaming gates_healthy -> mcps_healthy added ~16 bytes to the worst case.)
+// renaming gates_healthy -> mcps_healthy added ~16 bytes; v4's idle_s added
+// ~21 more. The buffer has not had to grow for either.)
 constexpr unsigned MEASUREMENT_JSON_CAPACITY = 224;
 
 // Serialize `t` plus the image version string into `out`.
@@ -67,7 +68,7 @@ inline int buildMeasurementJson(char* out, unsigned capacity,
         out, capacity,
         "{\"fw\":%u,\"ver\":\"%s\",\"uptime_s\":%lu,\"status\":%u,"
         "\"num_gates\":%u,\"mcps_healthy\":%u,\"total_in\":%lu,"
-        "\"total_out\":%lu,\"glitches\":%lu}",
+        "\"total_out\":%lu,\"glitches\":%lu,\"idle_s\":%lu}",
         static_cast<unsigned>(t.protocol_version),
         fw_version ? fw_version : "",
         static_cast<unsigned long>(t.uptime_s),
@@ -76,7 +77,8 @@ inline int buildMeasurementJson(char* out, unsigned capacity,
         static_cast<unsigned>(t.mcps_healthy),
         static_cast<unsigned long>(t.total_in),
         static_cast<unsigned long>(t.total_out),
-        static_cast<unsigned long>(t.glitch_count));
+        static_cast<unsigned long>(t.glitch_count),
+        static_cast<unsigned long>(t.idle_s));
     if (length <= 0 || static_cast<unsigned>(length) >= capacity) return -1;
     return length;
 }

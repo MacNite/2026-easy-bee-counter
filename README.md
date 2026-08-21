@@ -292,17 +292,36 @@ Sensors face upward from the bottom PCB into the channel. The black baffle absor
 
 | Component | Current | Count | Total |
 |---|---|---|---|
-| ESP32-C6 mini (active, no WiFi) | 15 mA | 1 | 15 mA |
+| ESP32-C6 mini (active, BLE advertising) | 15 mA | 1 | 15 mA |
 | MCP23017 (active) | 1 mA | 3 | 3 mA |
-| IR LEDs (pulsed while counting) | ~bank current | 3 banks | budget per LED string |
 | Quiescent leakage | — | — | ~1 mA |
-| **Bee counter total** | | | **~20 mA + LED draw** |
+| **Electronics subtotal** | | | **~19 mA** |
+| IR emitters, all banks lit (peak) | ~20–40 mA/gate | 24 gates | **~0.5–1.0 A** |
+| IR emitters, pulsed at 35 % duty (average) | | | **~170–350 mA** |
 | HiveScale ESP32 (sleep) | ~0.05 mA | 1 | 0.05 mA |
 | HiveScale ESP32 (awake, ~10 min cycle) | 80 mA × 30 s / 600 s | 1 | ~4 mA avg |
 
-The C6 firmware currently keeps the IR LEDs on continuously while counting
-(`LedMode::AUTO`); they can be forced off over I²C (`CMD_LEDS_OFF`) for
-diagnostics. If average power matters, a future revision can pulse the banks.
+**The emitters are the power budget.** Each gate drives two IR LEDs in series
+through a 22 Ω ballast off the 3.3 V rail — roughly (3.3 − 2·V_f)/22, i.e. tens
+of milliamps per gate — and the pulsed sampler lights all three banks together
+for the settle+read window of every 5 ms poll. Everything else on the board
+together is under 20 mA, an order of magnitude below. The per-gate figure
+depends on the actual LED forward voltage; **measure it on an assembled board**
+before sizing a panel or a pack, rather than trusting the range above.
+
+Two things follow, and both are implemented:
+
+* **Pulsed emitters** (`LedMode::AUTO`, the default since the 2026-06 revision)
+  cut the duty cycle from 100 % to ~35 %. Raising `POLL_INTERVAL_MS` lowers it
+  proportionally. There is no `CMD_LEDS_OFF` — that was an I²C command on the
+  wired link, which no longer exists; the bench overrides are the `-DIR_DEBUG`
+  console's `1`/`0`/`a` keys.
+* **Night mode** parks the emitters entirely through the hours honey bees do not
+  fly, on request from HiveHub. Over an 8–12 h night that is the difference
+  between the counter fitting an off-grid budget and not. See
+  [`docs/ble-mode.md`](docs/ble-mode.md#night-mode-the-control-characteristic) —
+  including why it is *not* implemented as deep sleep.
+
 Add solar for indefinite runtime.
 
 ---
@@ -314,18 +333,20 @@ GATT contract lives in [`docs/ble-mode.md`](docs/ble-mode.md); this is a summary
 
 - Advertises as `BeeCounter`; HiveHub connects by the MAC paired in its portal.
 - One service, `8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01`, holding a READ
-  measurement characteristic plus three OTA characteristics.
+  measurement characteristic, a READ/WRITE night-mode control characteristic and
+  three OTA characteristics.
 - The measurement value is built on read, so it is never a stale snapshot:
 
 ```json
-{"fw":3,"ver":"0.1.0","uptime_s":1234,"status":15,"num_gates":24,
- "mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2}
+{"fw":4,"ver":"0.2.0","uptime_s":1234,"status":15,"num_gates":24,
+ "mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2,"idle_s":0}
 ```
 
 `mcps_healthy` counts MCP23017 port expanders (0..3), not gates — each covers
-eight of the 24. `fw` is the wire format's revision, not the image version
-(`ver`); see [docs/ble-mode.md](docs/ble-mode.md) for the v2 → v3 delta and the
-deployment order it requires.
+eight of the 24. `idle_s` is the night-mode countdown, `0` while counting. `fw`
+is the wire format's revision, not the image version (`ver`); see
+[docs/ble-mode.md](docs/ble-mode.md) for the revision history and the deployment
+order it requires.
 
 ### Totals only
 
@@ -356,8 +377,9 @@ Implemented in `Firmware/` (PlatformIO, `seeed_xiao_esp32c6` env). See
   all 16 inputs per chip. Read failures are detected, so an expander that goes
   missing has its gates skipped rather than read as "all beams blocked", and is
   re-probed until it comes back.
-- **BLE/GATT peripheral:** serves lifetime totals as JSON on read, and accepts a
-  firmware image on the OTA characteristics (`src/ble_link.cpp`).
+- **BLE/GATT peripheral:** serves lifetime totals as JSON on read, accepts a
+  firmware image on the OTA characteristics, and takes a bounded "stop sensing"
+  request on the control characteristic (`src/ble_link.cpp`).
 - Per-gate debounce + direction state machine (IDLE → INNER/OUTER_FIRST →
   PAIRED) emits IN/OUT counts; glitches tallied for diagnostics. The logic lives
   in `Firmware/include/gate_logic.h` and is covered by host-side tests
@@ -374,6 +396,7 @@ Implemented in `Firmware/` (PlatformIO, `seeed_xiao_esp32c6` env). See
 - Difference consecutive totals server-side to get the interval counts.
 - Write combined record to SD card; transmit via WiFi if available.
 - Optionally relay a firmware update to the C6 over BLE (`update_beecounter`).
+- Optionally re-arm the counter's night-mode suspension for the next cycle.
 - Sleep ~10 minutes.
 
 ---
