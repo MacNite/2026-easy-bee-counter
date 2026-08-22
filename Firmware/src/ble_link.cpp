@@ -291,6 +291,28 @@ class ControlCallbacks : public NimBLECharacteristicCallbacks {
             applyIdleRequest(0);
             Serial.println(F("[BLE-CTRL] sensing resumed"));
             break;
+        case CTRL_OP_SET_BANKS: {
+            if (value.size() != CTRL_SET_BANKS_LENGTH) {
+                Serial.printf("[BLE-CTRL] SET_BANKS ignored: %u bytes, expected %u\n",
+                              (unsigned)value.size(),
+                              (unsigned)CTRL_SET_BANKS_LENGTH);
+                return;
+            }
+            // Deliberately NOT refused during an OTA, where SET_IDLE is. A
+            // suspension armed under a transfer would outlive the reboot it
+            // cannot survive; a bank mask is a configuration HiveHub re-asserts
+            // every cycle regardless, and refusing it here would only delay it
+            // by one. The emitters are dark for the transfer either way.
+            const uint8_t granted = applyBankMask(data[1]);
+            if (granted != data[1]) {
+                Serial.printf("[BLE-CTRL] banks 0x%02X requested, 0x%02X in force\n",
+                              (unsigned)data[1], (unsigned)granted);
+            } else {
+                Serial.printf("[BLE-CTRL] emitter banks set to 0x%02X\n",
+                              (unsigned)granted);
+            }
+            break;
+        }
         default:
             Serial.printf("[BLE-CTRL] unknown opcode 0x%02X ignored\n",
                           (unsigned)data[0]);
@@ -308,6 +330,9 @@ class ControlCallbacks : public NimBLECharacteristicCallbacks {
         value[2] = static_cast<uint8_t>(remaining >> 8);
         value[3] = static_cast<uint8_t>(remaining >> 16);
         value[4] = static_cast<uint8_t>(remaining >> 24);
+        // Appended in v5; a client that reads the first five bytes and stops
+        // sees exactly the value it saw before this byte existed.
+        value[5] = bankMask();
         characteristic->setValue(value, sizeof(value));
     }
 };

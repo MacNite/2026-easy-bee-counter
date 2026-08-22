@@ -41,13 +41,19 @@ namespace beecounter_proto {
 //      says whether the counter is deliberately not sensing (night mode) and
 //      for how much longer. Without it a night of zero crossings is
 //      indistinguishable from a counter whose emitters have failed.
+// v5 = adds the "banks" field: the bitmask of emitter banks (MOSFETs) that are
+//      currently enabled. Since the 2026-08 revision one FET feeds one
+//      MCP23017, so a disabled bank means eight specific gates are dark and
+//      not counted, and the totals for them are permanently flat. Without the
+//      field that is indistinguishable from a dead FET — the same failure
+//      idle_s was added to disambiguate, at a third of the counter each time.
 //
 // A counter in the field keeps emitting an older revision until it is updated
 // over the air, and the OTA relay has to read this very characteristic before
 // it can update anything — so HiveHub's parser reads "fw" first and accepts
 // every revision. Its tolerant parser must be deployed BEFORE any counter
 // emitting the new one.
-constexpr uint8_t PROTOCOL_VERSION = 4;
+constexpr uint8_t PROTOCOL_VERSION = 5;
 
 // --------------------------------------------------------------------------
 // Status bitfield — reported as the JSON "status" field
@@ -115,6 +121,43 @@ constexpr uint8_t OTA_ERR_NONE = 0x00;
 // behaviour it had before this existed.
 constexpr uint8_t CTRL_OP_SET_IDLE = 0x01;   // + duration_s (4 LE)
 constexpr uint8_t CTRL_OP_RESUME   = 0x02;   // no payload: sense again now
+constexpr uint8_t CTRL_OP_SET_BANKS = 0x03;  // + bank bitmask (1 byte)
+
+// --------------------------------------------------------------------------
+// Emitter bank enables — the second power control, and a very different one
+// --------------------------------------------------------------------------
+// Night mode answers "when should the whole counter stop?"; this answers "how
+// much of the counter should exist at all?". Since the 2026-08 hardware
+// revision there are three IRLB8721 MOSFETs, one per MCP23017, so an entrance
+// narrower than 24 gates — or a power budget that will not carry 24 — can run
+// with only the banks it needs:
+//
+//     bank 1 (bit 0) -> U2, gates 00..07
+//     bank 2 (bit 1) -> U3, gates 10..17
+//     bank 3 (bit 2) -> U4, gates 20..27
+//
+// Measured on the 3.3 V rail, with the pulsed sampler at its defaults:
+//     1 bank  /  8 gates  ~0.14 A
+//     2 banks / 16 gates  ~0.22 A
+//     3 banks / 24 gates  ~0.30 A
+// i.e. roughly 80 mA per bank on top of a ~60 mA floor, which is why this is a
+// coarse but very effective knob: dropping one bank saves about as much as a
+// quarter of the night does.
+//
+// Unlike night mode this is a CONFIGURATION, not a deadline — there is nothing
+// for it to expire into. It is still not persisted, for the same reason night
+// mode is not: a counter that resets comes back with everything enabled and
+// counting, and HiveHub re-asserts the mask on its next upload cycle. The worst
+// case is one cycle of drawing more current than asked, never a counter that
+// boots blind on eight gates because of a write it received a month ago.
+//
+// A mask of 0 is REFUSED rather than applied. It is not a configuration anyone
+// needs — a counter that should count nothing is unpaired — and accepting it
+// would turn one malformed byte into a permanently blind counter, which is
+// exactly what every other decision in this file is arranged to prevent. Bits
+// above the highest bank are ignored, so a future four-FET board reading this
+// firmware's mask sees no phantom bank.
+constexpr uint8_t BANK_MASK_ALL = 0x07;   // all three banks enabled (default)
 
 // Longest suspension the counter will accept, whatever HiveHub asks for. One
 // hour is several times HiveHub's default 10-minute upload cycle — enough that
@@ -126,15 +169,23 @@ constexpr uint8_t CTRL_OP_RESUME   = 0x02;   // no payload: sense again now
 constexpr uint32_t MAX_IDLE_SECONDS = 3600;
 
 // Control status, as read back from the control characteristic:
-//     state(1) + remaining_s(4 LE)
-// state is one of the two below; remaining_s is 0 unless idle.
+//     state(1) + remaining_s(4 LE) + bank_mask(1)
+// state is one of the two below; remaining_s is 0 unless idle; bank_mask is the
+// enabled-bank bitmask currently in force.
+//
+// The trailing byte is new in protocol v5 and is deliberately APPENDED: a
+// client that reads five bytes and stops — every HiveHub built against v4 —
+// still gets exactly the value it used to.
 constexpr uint8_t CTRL_STATE_SENSING = 0x00;
 constexpr uint8_t CTRL_STATE_IDLE    = 0x01;
 
 // Bytes in that read-back value.
-constexpr uint8_t CTRL_STATUS_LENGTH = 5;
+constexpr uint8_t CTRL_STATUS_LENGTH = 6;
 
 // Bytes in a well-formed SET_IDLE write (opcode + uint32 LE).
 constexpr uint8_t CTRL_SET_IDLE_LENGTH = 5;
+
+// Bytes in a well-formed SET_BANKS write (opcode + mask).
+constexpr uint8_t CTRL_SET_BANKS_LENGTH = 2;
 
 }  // namespace beecounter_proto

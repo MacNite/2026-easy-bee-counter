@@ -61,7 +61,7 @@ the 3× MCP23017 port expanders.
 
 | # | Component | Qty | Notes |
 |---|-----------|-----|-------|
-| 4 | IRLB8721PbF N-channel MOSFET (TO-220) | 3 | 3.3 V gate-safe. One per MCP23017: Q1 = LED_BANK_1 (gates 00..07), Q2 = LED_BANK_2 (gates 10..17), Q3 = LED_BANK_3 (gates 20..27) |
+| 4 | IRLB8721PbF N-channel MOSFET (TO-220) | 3 | 3.3 V gate-safe. One per MCP23017: Q1 = LED_BANK_1 (gates 00..07), Q2 = LED_BANK_2 (gates 10..17), Q3 = LED_BANK_3 (gates 20..27). Individually switchable at runtime — see [Power Budget](#6-power-budget) |
 
 ### 2.5 Resistors
 
@@ -309,7 +309,7 @@ together is under 20 mA, an order of magnitude below. The per-gate figure
 depends on the actual LED forward voltage; **measure it on an assembled board**
 before sizing a panel or a pack, rather than trusting the range above.
 
-Two things follow, and both are implemented:
+Three things follow, and all three are implemented:
 
 * **Pulsed emitters** (`LedMode::AUTO`, the default since the 2026-06 revision)
   cut the duty cycle from 100 % to ~35 %. Raising `POLL_INTERVAL_MS` lowers it
@@ -321,6 +321,21 @@ Two things follow, and both are implemented:
   between the counter fitting an off-grid budget and not. See
   [`docs/ble-mode.md`](docs/ble-mode.md#night-mode-the-control-characteristic) —
   including why it is *not* implemented as deep sleep.
+* **Per-bank enables** switch the three MOSFETs individually, so an entrance
+  narrower than 24 gates costs only the banks it uses. Measured on an assembled
+  board, at 3.3 V:
+
+  | Banks enabled | Gates counted | Draw |
+  |---|---|---|
+  | 1 | 8 | ~0.14 A |
+  | 2 | 16 | ~0.22 A |
+  | 3 (default) | 24 | ~0.30 A |
+
+  Roughly 80 mA per bank on top of a ~60 mA floor. All three are enabled unless
+  HiveHub says otherwise (three checkboxes per device in its dashboard), and a
+  counter that resets comes back with all three on. It composes with night mode
+  rather than competing with it. See
+  [`docs/ble-mode.md`](docs/ble-mode.md#emitter-banks-the-other-power-control).
 
 Add solar for indefinite runtime.
 
@@ -333,8 +348,8 @@ GATT contract lives in [`docs/ble-mode.md`](docs/ble-mode.md); this is a summary
 
 - Advertises as `BeeCounter`; HiveHub connects by the MAC paired in its portal.
 - One service, `8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01`, holding a READ
-  measurement characteristic, a READ/WRITE night-mode control characteristic and
-  three OTA characteristics.
+  measurement characteristic, a READ/WRITE control characteristic (night mode
+  and emitter-bank enables) and three OTA characteristics.
 - The measurement value is built on read, so it is never a stale snapshot:
 
 ```json
@@ -379,14 +394,16 @@ Implemented in `Firmware/` (PlatformIO, `seeed_xiao_esp32c6` env). See
   re-probed until it comes back.
 - **BLE/GATT peripheral:** serves lifetime totals as JSON on read, accepts a
   firmware image on the OTA characteristics, and takes a bounded "stop sensing"
-  request on the control characteristic (`src/ble_link.cpp`).
+  request plus an emitter-bank enable mask on the control characteristic
+  (`src/ble_link.cpp`).
 - Per-gate debounce + direction state machine (IDLE → INNER/OUTER_FIRST →
   PAIRED) emits IN/OUT counts; glitches tallied for diagnostics. The logic lives
   in `Firmware/include/gate_logic.h` and is covered by host-side tests
   (`Firmware/test/run_tests.sh`).
 - IR banks driven on GPIO19 / silk D8 (bank 1), GPIO20 / silk D9 (bank 2) and
-  GPIO18 / silk D10 (bank 3) — one MOSFET per MCP23017; LED mode settable from
-  the IR_DEBUG serial console.
+  GPIO18 / silk D10 (bank 3) — one MOSFET per MCP23017. LED mode and per-bank
+  enables are both settable from the IR_DEBUG serial console (`1`/`0`/`a` and
+  `4`/`5`/`6`), and the bank mask is settable over BLE by HiveHub.
 - BLE OTA image receiver (`Update` library) with size + CRC-32 verification
   before the inactive app slot is selected.
 
@@ -396,7 +413,8 @@ Implemented in `Firmware/` (PlatformIO, `seeed_xiao_esp32c6` env). See
 - Difference consecutive totals server-side to get the interval counts.
 - Write combined record to SD card; transmit via WiFi if available.
 - Optionally relay a firmware update to the C6 over BLE (`update_beecounter`).
-- Optionally re-arm the counter's night-mode suspension for the next cycle.
+- Optionally re-arm the counter's night-mode suspension for the next cycle, and
+  re-assert its emitter-bank enable mask.
 - Sleep ~10 minutes.
 
 ---

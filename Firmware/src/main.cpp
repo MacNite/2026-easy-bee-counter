@@ -29,6 +29,28 @@
 //   5. Suspends 1-3 on request (night mode), so the emitters — which dominate
 //      this board's power draw by an order of magnitude — are dark through the
 //      hours European honey bees do not fly. See the section below.
+//   6. Runs on a subset of its three emitter banks on request, so an entrance
+//      narrower than 24 gates — or a supply that will not carry 24 — costs only
+//      the banks it uses. See the section below.
+//
+// Emitter bank enables (protocol v5)
+// ----------------------------------
+// The 2026-08 revision put one IRLB8721 behind each MCP23017, which makes each
+// bank independently switchable: bank 1 = U2 = gates 00..07, bank 2 = U3 =
+// 10..17, bank 3 = U4 = 20..27. Measured on the 3.3 V rail with the pulsed
+// sampler at its defaults, one bank draws ~0.14 A, two ~0.22 A and three
+// ~0.30 A, so dropping a bank is worth roughly 80 mA continuously — about what
+// a quarter of a night of night mode saves, except it applies all day.
+//
+// This is a configuration rather than a deadline, so unlike night mode it has
+// no expiry; like night mode it is deliberately NOT persisted, and HiveHub
+// re-asserts it every upload cycle. A reset therefore comes back counting on
+// all 24 gates. The mask arithmetic lives in include/bank_state.h.
+//
+// The gates of a dark bank are SKIPPED, not merely unlit. An unpowered QRE1113
+// is a bare phototransistor under a 100k pull-up, and direct sun into a hive
+// entrance can pull one low; feeding those readings to the state machine would
+// invent crossings on gates the operator switched off.
 //
 // Night mode (protocol v4)
 // ------------------------
@@ -70,6 +92,7 @@
 #include "counter_protocol.h"
 #include "gate_logic.h"
 #include "idle_state.h"
+#include "bank_state.h"
 
 // The BLE/GATT transport: a connectable NimBLE GATT server serving the
 // measurement characteristic and the OTA characteristics. See ble_link.h.
@@ -207,6 +230,13 @@ static volatile uint8_t  g_status_flags  = 0;
 // ble::applyIdleRequest() below. Never persisted: a reset resumes counting.
 static idlestate::State g_idle;
 
+// Which emitter banks are allowed to light. Owned here for the same reason
+// g_idle is — this file drives the FET gates — and armed from the BLE control
+// characteristic through ble::applyBankMask() below. Never persisted: a reset
+// comes back with all three banks counting, and HiveHub re-asserts the mask on
+// its next upload cycle. See bank_state.h.
+static bankstate::State g_banks;
+
 // ============================================================================
 // MCP23017 channels + runtime health  (all on Wire / bus 0)
 // ============================================================================
@@ -293,8 +323,14 @@ static volatile LedMode g_led_mode = LedMode::AUTO;
 // can momentarily turn the LEDs on/off within AUTO mode without fighting the
 // mode gate.
 static void driveIrLeds(bool on) {
+    // A disabled bank's FET gate is held LOW whatever `on` says: this is the
+    // one place that decides whether an emitter rail is ever energised, so
+    // enforcing the mask here means no other path — the pulsed sampler, the
+    // FORCE_ON debug mode, the night-mode backstop — can light a bank the
+    // operator switched off.
     for (uint8_t b = 0; b < pins::NUM_LED_BANKS; b++) {
-        digitalWrite(pins::IR_LED_BANK_EN[b], on ? HIGH : LOW);
+        const bool live = on && bankstate::enabled(g_banks, (uint8_t)(b + 1));
+        digitalWrite(pins::IR_LED_BANK_EN[b], live ? HIGH : LOW);
     }
     if (on) g_status_flags |=  beecounter_proto::STATUS_IR_LEDS_ON;
     else    g_status_flags &= ~beecounter_proto::STATUS_IR_LEDS_ON;
@@ -340,6 +376,19 @@ static bool initMcp(Adafruit_MCP23X17& mcp, uint8_t addr, const char* tag,
 static void resetGatesForMcp(uint8_t addr) {
     for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
         if (gates::TABLE[i].mcp_address == addr) {
+            g_gate_rt[i] = gatelogic::GateRuntime();
+        }
+    }
+}
+
+// Drop every gate on one emitter bank back to IDLE. Called when a bank is
+// switched off (its gates stop being sampled, so a half-finished pairing would
+// otherwise sit there indefinitely) and when one is switched back on (the
+// pairing predates however long the bank was dark). Same reasoning as
+// resetGatesForMcp() across a chip outage; the lifetime totals are untouched.
+static void resetGatesForBank(uint8_t bank) {
+    for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
+        if (gates::TABLE[i].led_bank == bank) {
             g_gate_rt[i] = gatelogic::GateRuntime();
         }
     }
@@ -518,6 +567,12 @@ static bool pollAllGates() {
 
     for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
         const auto& loc = gates::TABLE[i];
+        // A gate on a disabled bank is skipped, not read as "clear": its
+        // emitters are dark, so the phototransistor is only reporting ambient
+        // light, and sun into the entrance would fabricate crossings on gates
+        // the operator deliberately switched off. The chip itself is still read
+        // above, so mcps_healthy keeps meaning "expanders answering".
+        if (!bankstate::enabled(g_banks, loc.led_bank)) continue;
         const int8_t ch = mcpIndexForAddress(loc.mcp_address);
         if (ch < 0 || !g_mcp[ch].valid) continue;   // no trustworthy sample
         const uint16_t v = g_mcp[ch].value;
@@ -569,7 +624,15 @@ static bool pollAllGates() {
 //   0  force IR LEDs OFF
 //   a  IR LEDs AUTO       (normal pulsed mode)
 //   n  arm a 60 s night-mode suspension (press again to resume)
+//   4  toggle emitter bank 1 (gates 00..07)
+//   5  toggle emitter bank 2 (gates 10..17)
+//   6  toggle emitter bank 3 (gates 20..27)
 //   h  print the command list
+//
+// The bank keys are 4/5/6 because the schematic calls those rails /GPIO4,
+// /GPIO5 and /GPIO6 — misleading net names (they are physically GPIO19/20/18,
+// see pins.h) but the labels silkscreened next to the FETs, which is what
+// someone with a probe in one hand is actually reading.
 // ============================================================================
 #ifdef IR_DEBUG
 
@@ -587,6 +650,9 @@ static void irDebugPrintHelp() {
     Serial.println(F("  0  force IR LEDs OFF"));
     Serial.println(F("  a  IR LEDs AUTO (pulsed, normal mode)"));
     Serial.println(F("  n  arm/clear a 60 s night-mode suspension"));
+    Serial.println(F("  4  toggle emitter bank 1 (gates 00..07)"));
+    Serial.println(F("  5  toggle emitter bank 2 (gates 10..17)"));
+    Serial.println(F("  6  toggle emitter bank 3 (gates 20..27)"));
     Serial.println(F("  h  show this help"));
     Serial.println();
 }
@@ -604,9 +670,10 @@ static void irDebugReadAndPrint() {
 
     auto getBit = [](uint16_t v, uint8_t pin) -> bool { return (v >> pin) & 0x1; };
 
-    Serial.printf("[IR] t=%lus raw U2=0x%04X U3=0x%04X U4=0x%04X read_ok=%d\n",
+    Serial.printf("[IR] t=%lus raw U2=0x%04X U3=0x%04X U4=0x%04X read_ok=%d "
+                  "banks=0x%02X\n",
                   (unsigned long)(now_ms / 1000), g_mcp[0].value, g_mcp[1].value,
-                  g_mcp[2].value, ok ? 1 : 0);
+                  g_mcp[2].value, ok ? 1 : 0, (unsigned)g_banks.mask);
     for (uint8_t i = 0; i < gates::NUM_GATES; i++) {
         const auto& loc = gates::TABLE[i];
         const int8_t ch = mcpIndexForAddress(loc.mcp_address);
@@ -619,6 +686,15 @@ static void irDebugReadAndPrint() {
             continue;
         }
         const uint16_t v = g_mcp[ch].value;
+        if (!bankstate::enabled(g_banks, loc.led_bank)) {
+            // The chip answered, but this gate's emitters are switched off, so
+            // whatever the phototransistor says is ambient light and not a
+            // beam state. Saying "clear" here would be the same lie as saying
+            // it for a chip that failed to read.
+            Serial.printf("  %-8s bank:%u  <bank disabled>\n", loc.tag,
+                          (unsigned)loc.led_bank);
+            continue;
+        }
         // BLOCKED == beam reflected/interrupted == sensor line LOW (bit 0).
         bool inner_blocked = !getBit(v, loc.inner_pin);
         bool outer_blocked = !getBit(v, loc.outer_pin);
@@ -697,6 +773,22 @@ static void irDebugPoll() {
                           (unsigned long)granted);
             break;
         }
+        case '4':
+        case '5':
+        case '6': {
+            // Toggle one bank. A refused request (the last bank going off)
+            // reports itself from applyBankMask(), so nothing extra is needed
+            // here to explain why the mask did not move.
+            const uint8_t bank = (uint8_t)(c - '3');   // '4' -> 1
+            const uint8_t bit  = bankstate::bankBit(bank);
+            const uint8_t want = (uint8_t)(g_banks.mask ^ bit);
+            const uint8_t got  = ble::applyBankMask(want);
+            Serial.printf("[IR-DEBUG] bank %u %s — mask 0x%02X\n",
+                          (unsigned)bank,
+                          (got & bit) ? "ENABLED" : "disabled",
+                          (unsigned)got);
+            break;
+        }
         case 'h':
         case '?':
             irDebugPrintHelp();
@@ -759,6 +851,11 @@ void getTelemetry(Telemetry& t) {
     t.total_out        = g_total_out;
     t.glitch_count     = g_glitch_count;
     t.idle_s           = idle_left;
+    // Reported unconditionally, including the 0x07 of a counter nobody has
+    // reconfigured. A consumer that only saw the field when it was interesting
+    // could not tell "all banks on" from "counter too old to say", and those
+    // are opposite readings of the same flat totals.
+    t.bank_mask        = g_banks.mask;
 }
 
 uint32_t applyIdleRequest(uint32_t duration_s) {
@@ -790,6 +887,39 @@ uint32_t applyIdleRequest(uint32_t duration_s) {
 
 uint32_t idleRemainingSeconds() {
     return idlestate::remainingSeconds(g_idle, millis());
+}
+
+uint8_t applyBankMask(uint8_t mask) {
+    const bankstate::Request r = bankstate::request(g_banks, mask);
+    if (!r.accepted) {
+        // bank_state.h refuses an all-off mask rather than blinding the
+        // counter on one byte. Say so: the alternative is a HiveHub that
+        // believes it switched everything off and a counter that did not.
+        Serial.printf("[BANKS] request 0x%02X refused; still 0x%02X\n",
+                      (unsigned)mask, (unsigned)g_banks.mask);
+        return g_banks.mask;
+    }
+    if (r.changed) {
+        // Both edges matter. A bank going dark leaves any half-finished
+        // pairing on its gates unfinishable; a bank coming back would otherwise
+        // combine a pairing from before the gap with a sample from after it.
+        for (uint8_t b = 1; b <= pins::NUM_LED_BANKS; b++) {
+            resetGatesForBank(b);
+        }
+        // Park the FETs on the new mask immediately rather than waiting for the
+        // next poll — drawing the current is the whole thing being switched off.
+        driveIrLeds(false);
+        Serial.printf("[BANKS] mask 0x%02X — %u of %u banks, %u gates active\n",
+                      (unsigned)r.granted,
+                      (unsigned)bankstate::enabledCount(g_banks),
+                      (unsigned)pins::NUM_LED_BANKS,
+                      (unsigned)(bankstate::enabledCount(g_banks) * 8u));
+    }
+    return r.granted;
+}
+
+uint8_t bankMask() {
+    return g_banks.mask;
 }
 
 }  // namespace ble
@@ -847,6 +977,11 @@ void setup() {
 
     g_status_flags |= beecounter_proto::STATUS_READY;
 
+    Serial.printf("[SETUP] emitter banks 0x%02X (%u of %u, %u gates active)\n",
+                  (unsigned)g_banks.mask,
+                  (unsigned)bankstate::enabledCount(g_banks),
+                  (unsigned)pins::NUM_LED_BANKS,
+                  (unsigned)(bankstate::enabledCount(g_banks) * 8u));
     Serial.println("[SETUP] Entering normal counting loop (pulsed IR)");
 
 #ifdef IR_DEBUG
@@ -929,13 +1064,14 @@ void loop() {
         last_dump_ms = now;
         Serial.printf(
             "[STAT] uptime=%lus total_in=%lu total_out=%lu "
-            "glitches=%lu status=0x%02X idle=%lus\n",
+            "glitches=%lu status=0x%02X idle=%lus banks=0x%02X\n",
             (unsigned long)(now / 1000),
             (unsigned long)g_total_in,
             (unsigned long)g_total_out,
             (unsigned long)g_glitch_count,
             (unsigned)g_status_flags,
-            (unsigned long)idlestate::remainingSeconds(g_idle, now)
+            (unsigned long)idlestate::remainingSeconds(g_idle, now),
+            (unsigned)g_banks.mask
         );
     }
 }
