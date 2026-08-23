@@ -24,19 +24,19 @@ advertises as `BeeCounter`, but HiveHub connects by the paired MAC.
 | Service | `8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
 | Measurement characteristic | `8e8b0102-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
 | Properties | READ |
-| Control characteristic (night mode) | `8e8b0103-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
+| Control characteristic (night mode + emitter banks) | `8e8b0103-7a1c-4b9e-9a2f-1d6e0b9c1a01` |
 | Properties | READ, WRITE |
 
 The value is generated when HiveHub reads it, so it contains current lifetime
 totals rather than a periodically cached snapshot:
 
 ```json
-{"fw":4,"ver":"0.2.0","uptime_s":1234,"status":15,"num_gates":24,"mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2,"idle_s":0}
+{"fw":5,"ver":"0.3.0","uptime_s":1234,"status":15,"num_gates":24,"mcps_healthy":3,"total_in":100,"total_out":95,"glitches":2,"idle_s":0,"banks":7}
 ```
 
 | Field | Type | Meaning |
 | --- | --- | --- |
-| `fw` | uint8 | Revision of *this document's* format (`PROTOCOL_VERSION`), currently 4 |
+| `fw` | uint8 | Revision of *this document's* format (`PROTOCOL_VERSION`), currently 5 |
 | `ver` | string | Image version from `include/version.h`, `MAJOR.MINOR.PATCH` |
 | `uptime_s` | uint32 | Seconds since boot |
 | `status` | uint8 | Status bitfield, see `include/counter_protocol.h` |
@@ -45,6 +45,7 @@ totals rather than a periodically cached snapshot:
 | `total_in` / `total_out` | uint32 | Monotonic lifetime totals, saturating |
 | `glitches` | uint32 | Diagnostic tally of ambiguous/aborted pairings, saturating |
 | `idle_s` | uint32 | Seconds of night-mode suspension still to run; `0` while counting |
+| `banks` | uint8 | Bitmask of enabled emitter banks (MOSFETs): bit 0 = gates 00..07, bit 1 = 10..17, bit 2 = 20..27. `7` unless banks have been switched off |
 
 The field names, UUIDs, and integer types match HiveHub's
 `firmware/include/bee_counter_wire.h` parser, which reads `fw` first and
@@ -129,7 +130,7 @@ not a consumption.
 
 ## Power and performance choices
 
-* Measurement JSON uses a fixed 224-byte stack buffer, without ArduinoJson or
+* Measurement JSON uses a fixed 240-byte stack buffer, without ArduinoJson or
   `String` heap churn.
 * Telemetry is serialized only on a GATT read, not every two seconds.
 * The measurement path remains read-only; OTA uses three separate
@@ -177,7 +178,8 @@ schedule; the counter is told only *how long* to stay quiet:
 | --- | --- |
 | SET_IDLE | `0x01 + duration_s(4 LE)` |
 | RESUME | `0x02` |
-| Read-back | `state(1) + remaining_s(4 LE)`, state `0x00` sensing / `0x01` idle |
+| SET_BANKS | `0x03 + bank_mask(1)` — see [Emitter banks](#emitter-banks-the-other-power-control) |
+| Read-back | `state(1) + remaining_s(4 LE) + bank_mask(1)`, state `0x00` sensing / `0x01` idle |
 
 A `SET_IDLE` of `0` means the same thing as `RESUME`, so HiveHub can cancel on a
 connection it already has without a second opcode.
@@ -237,6 +239,85 @@ interval across the suspension is genuinely zero rather than missing. The
 that from a counter whose emitter FETs have died — which produces an identical
 row of zeros and is otherwise indistinguishable until someone reads a week of
 totals.
+
+## Emitter banks (the other power control)
+
+Night mode answers *when should the counter stop?* This answers *how much of
+the counter should exist at all?*
+
+Since the 2026-08 hardware revision the 48 IR emitters are split across three
+IRLB8721 MOSFETs, one per MCP23017, so each third of the entrance is
+independently switchable:
+
+| Bank | Bit | Expander | Gates |
+| --- | --- | --- | --- |
+| 1 | `0x01` | U2 @ 0x20 | 00..07 |
+| 2 | `0x02` | U3 @ 0x21 | 10..17 |
+| 3 | `0x04` | U4 @ 0x22 | 20..27 |
+
+Measured on the 3.3 V rail with the pulsed sampler at its defaults:
+
+| Banks enabled | Gates counted | Draw @ 3.3 V |
+| --- | --- | --- |
+| 1 | 8 | ~0.14 A |
+| 2 | 16 | ~0.22 A |
+| 3 (default) | 24 | ~0.30 A |
+
+That is roughly 80 mA per bank on top of a ~60 mA floor — dropping one bank
+saves about as much current as a quarter of a night of night mode, except it
+applies around the clock. The two features compose: a counter can be running on
+one bank *and* be suspended, and the numbers multiply rather than compete.
+
+Use it when the entrance is physically narrower than 24 gates, when a hive is
+being run with part of its entrance closed, or when an off-grid supply will not
+carry the full board. It is a **configuration**, not a schedule — HiveHub's
+dashboard exposes it as three checkboxes per device, all ticked by default.
+
+### The rules, and why each one exists
+
+* **All three enabled is the default and the post-reset state.** Nothing about
+  this is persisted on the counter, exactly as with night mode: a brownout, a
+  watchdog or an OTA reboot comes back counting all 24 gates, and HiveHub
+  re-asserts the mask on its next upload cycle. The worst case is one cycle of
+  drawing more current than was asked for — never a counter that boots blind on
+  two thirds of its entrance because of a write it received a month ago.
+* **A mask of `0` is refused, not applied.** The counter keeps whatever it had
+  and says so on the serial log. Blinding a counter entirely is not a
+  configuration anyone needs — a counter that should count nothing is unpaired
+  — and accepting it would let one corrupted byte stop counting until someone
+  walks to the hive. Same reasoning as `start == end` disabling the night
+  window rather than covering the whole day.
+* **Bits above bank 3 are ignored.** A four-FET board's mask arriving here must
+  not conjure a bank whose GPIO does not exist. A mask of *only* phantom bits is
+  therefore a zero mask, and is refused as one.
+* **Gates on a dark bank are skipped, not read as "clear".** An unpowered
+  QRE1113 is a bare phototransistor under a 100 k pull-up, and direct sun into a
+  hive entrance can pull one low. Feeding those readings to the state machine
+  would invent crossings on gates the operator deliberately switched off.
+* **The expander is still read and still health-checked.** `mcps_healthy` keeps
+  meaning "MCP23017s answering on the I²C bus", so a chip that dies while its
+  bank is off is still visible. The read costs about half a millisecond and no
+  measurable current; the emitters are what the feature is about.
+* **`num_gates` keeps reporting 24.** It describes what is *wired*, which has
+  not changed. Active gates are `popcount(banks) * 8`, derived by the consumer,
+  so the meaning of every stored reading stays fixed.
+* **It is accepted during an OTA**, where `SET_IDLE` is refused. A suspension
+  armed under a transfer would outlive a reboot it cannot survive; a bank mask
+  is re-asserted every cycle anyway, and the emitters are dark for the transfer
+  either way.
+
+### What a switched-off bank looks like in the data
+
+A third of the entrance stops contributing to `total_in` / `total_out`
+permanently — which is character for character what a dead emitter FET produces.
+`banks` is the only thing that separates them, which is why it is emitted on
+every document including the `7` of a counter nobody has reconfigured: a field
+that appeared only when it was interesting would make "all banks on" and
+"counter too old to say" the same absence.
+
+On the bench the `-DIR_DEBUG` console toggles banks live with the `4`, `5` and
+`6` keys (named for the schematic's `/GPIO4`, `/GPIO5`, `/GPIO6` FET rails), and
+prints the mask on every readout.
 
 ## Firmware update over connectable BLE
 
@@ -344,7 +425,31 @@ before treating OTA as secure against a nearby active attacker.
 set, name, meaning or range of the reported fields changes; a firmware fix that
 reports the same fields bumps `ver` and leaves `fw` alone.
 
-### v4 — current
+### v5 — current
+
+Emitter bank enables. The three MOSFETs of the 2026-08 board can be switched
+individually (see [Emitter banks](#emitter-banks-the-other-power-control)), and
+the document now says which are live.
+
+| Change | v4 | v5 |
+| --- | --- | --- |
+| Enabled emitter banks | — | `banks` (uint8 bitmask, `7` = all three) |
+| Control opcode `0x03` | unused | `SET_BANKS`, `0x03 + bank_mask(1)` |
+| Control read-back | `state(1) + remaining_s(4 LE)` | + `bank_mask(1)`, appended |
+
+Additive in both directions, and deliberately so. A parser that skips unknown
+keys reads a v5 document as a v4 one; a client that reads five bytes of the
+control read-back and stops gets exactly the value it got before. The usual
+deployment-order rule still applies for the same reason it did at v4: a HiveHub
+that does not understand `banks` cannot tell a switched-off bank from a dead
+FET, and it is HiveHub that switches them off.
+
+A counter running v4 or earlier has no `SET_BANKS` opcode. The write is ignored
+and logged as an unknown opcode, so the feature degrades to "this counter runs
+all three banks" — never to an error. HiveHub gates the write on `fw >= 5`
+rather than relying on that.
+
+### v4
 
 Night mode. The counter can be told to stop sensing for a bounded period (see
 [Night mode](#night-mode-the-control-characteristic)), and the document now says
@@ -408,10 +513,11 @@ alone until both sides can be revised together.
   authorization and no firmware signature check: CRC-32 is an integrity check,
   not an authenticity one, so anyone in radio range can push a validly-framed
   image — and, since v4, write a `SET_IDLE` and stop the counter for up to an
-  hour. The second is strictly the lesser of the two (it expires by itself, it
-  changes nothing persistent, and anyone able to do it could already replace the
-  firmware), but it is a new way to deny counting and it is named here rather
-  than left to be discovered. This is an accepted, documented risk rather than an oversight, but
+  hour, or, since v5, a `SET_BANKS` and dark two thirds of its entrance. Both
+  are strictly the lesser of the two (neither is persisted, both are re-asserted
+  by HiveHub within one upload cycle, and anyone able to do either could already
+  replace the firmware), but they are new ways to deny counting and they are
+  named here rather than left to be discovered. This is an accepted, documented risk rather than an oversight, but
   closing it needs a design decision (Secure Boot + signed images vs. a
   BLE-layer authentication handshake vs. a per-device provisioning key) *and* a
   migration story for counters already in the field, since an unauthenticated

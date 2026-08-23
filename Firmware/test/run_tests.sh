@@ -11,7 +11,9 @@
 #                                 wire contract;
 #   * include/idle_state.h      — the night-mode suspension deadline, including
 #                                 the millis() rollover and the "HiveHub stopped
-#                                 re-arming" case.
+#                                 re-arming" case;
+#   * include/bank_state.h      — the emitter-bank enable mask, whose mistakes
+#                                 are eight gates that silently stop counting.
 #
 # Everything hardware-facing stays in src/main.cpp and is still verified on the
 # bench (see the IR_DEBUG console in the README).
@@ -47,3 +49,10 @@ trap 'rm -rf "$OUT"' EXIT
     -o "$OUT/test_idle_state"
 
 "$OUT/test_idle_state"
+
+"$CXX" -std=c++11 -Wall -Wextra -Werror \
+    -I include \
+    test/test_bank_state/test_bank_state.cpp \
+    -o "$OUT/test_bank_state"
+
+"$OUT/test_bank_state"

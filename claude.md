@@ -44,6 +44,8 @@ backend.
   - `src/ble_link.cpp` — NimBLE GATT peripheral: the measurement characteristic,
     the night-mode control characteristic and the OTA characteristics.
   - `include/idle_state.h` — night-mode suspension as pure deadline arithmetic.
+  - `include/bank_state.h` — the emitter-bank (MOSFET) enable mask, as pure
+    bitmask rules.
   - `include/pins.h` — **authoritative** GPIO map for the PCB.
   - `include/counter_protocol.h` — status bitfield + OTA state codes shared
     between `main.cpp` and `ble_link.cpp`.
@@ -91,6 +93,13 @@ backend.
 - **Three IR emitter banks, one MOSFET per MCP23017** since the 2026-08 hardware
   revision: bank 1 = gates 00..07 (U2), bank 2 = 10..17 (U3), bank 3 = 20..27
   (U4). Older docs describing a 2-FET split (00..13 / 14..27) are stale.
+- **Each bank is individually switchable** (protocol v5), because one bank
+  costs ~0.14 A, two ~0.22 A and three ~0.30 A at 3.3 V. Same fail-open rules as
+  night mode: not persisted, re-asserted by HiveHub every cycle, all three on
+  after any reset, and an all-off mask REFUSED rather than applied. Gates on a
+  dark bank must be *skipped*, never read as "clear" — an unpowered QRE1113 is a
+  bare phototransistor and sunlight into the entrance will pull it low. See
+  `include/bank_state.h` and `docs/ble-mode.md`.
 - OTA needs the dual-slot `partitions_4mb_ota_no_fs.csv` layout. A board still
   running a single-app image has to be updated once over USB.
 

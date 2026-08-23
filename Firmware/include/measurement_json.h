@@ -35,19 +35,20 @@ namespace beecounter_proto {
 //
 //   {"fw":255,"ver":"<15>","uptime_s":4294967295,"status":255,"num_gates":255,
 //    "mcps_healthy":255,"total_in":4294967295,"total_out":4294967295,
-//    "glitches":4294967295,"idle_s":4294967295}
+//    "glitches":4294967295,"idle_s":4294967295,"banks":255}
 //
-// is 191 bytes, plus the NUL — measured, not estimated, by
+// is 203 bytes, plus the NUL — measured, not estimated, by
 // test/test_measurement_json/ (which prints the number and fails if it grows
-// past the buffer). 224 leaves room for a version string longer than any
+// past the buffer). 240 leaves room for a version string longer than any
 // version.h has carried without another audit of this number; the truncation
 // check in buildMeasurementJson() is what actually guarantees a malformed
 // document is never published, so this is headroom, not a promise.
 //
 // (v2 fitted in ~155 bytes. Widening uptime_s and glitches to 32 bits and
 // renaming gates_healthy -> mcps_healthy added ~16 bytes; v4's idle_s added
-// ~21 more. The buffer has not had to grow for either.)
-constexpr unsigned MEASUREMENT_JSON_CAPACITY = 224;
+// ~21 more, both absorbed by the old 224-byte buffer. v5's "banks" added ~12
+// and is what finally moved it.)
+constexpr unsigned MEASUREMENT_JSON_CAPACITY = 240;
 
 // Serialize `t` plus the image version string into `out`.
 //
@@ -68,7 +69,8 @@ inline int buildMeasurementJson(char* out, unsigned capacity,
         out, capacity,
         "{\"fw\":%u,\"ver\":\"%s\",\"uptime_s\":%lu,\"status\":%u,"
         "\"num_gates\":%u,\"mcps_healthy\":%u,\"total_in\":%lu,"
-        "\"total_out\":%lu,\"glitches\":%lu,\"idle_s\":%lu}",
+        "\"total_out\":%lu,\"glitches\":%lu,\"idle_s\":%lu,"
+        "\"banks\":%u}",
         static_cast<unsigned>(t.protocol_version),
         fw_version ? fw_version : "",
         static_cast<unsigned long>(t.uptime_s),
@@ -78,7 +80,8 @@ inline int buildMeasurementJson(char* out, unsigned capacity,
         static_cast<unsigned long>(t.total_in),
         static_cast<unsigned long>(t.total_out),
         static_cast<unsigned long>(t.glitch_count),
-        static_cast<unsigned long>(t.idle_s));
+        static_cast<unsigned long>(t.idle_s),
+        static_cast<unsigned>(t.bank_mask));
     if (length <= 0 || static_cast<unsigned>(length) >= capacity) return -1;
     return length;
 }

@@ -30,6 +30,13 @@ struct Telemetry {
     // anyone reading the stored history later — tell "no bees flew" from "this
     // counter was deliberately not looking", which the totals alone cannot say.
     uint32_t idle_s;
+    // Enabled emitter banks, one bit per MOSFET (bit 0 = bank 1 = gates
+    // 00..07, and so on). New in protocol v5, reported as "banks". A cleared
+    // bit means those eight gates are dark and deliberately not counted, so
+    // their share of the totals stays flat — which without this field is
+    // indistinguishable from the FET having died. 0x07 on any counter that
+    // has not been told otherwise.
+    uint8_t bank_mask;
 };
 
 void getTelemetry(Telemetry& out);
@@ -43,6 +50,17 @@ uint32_t applyIdleRequest(uint32_t duration_s);
 
 // Seconds of suspension left, for the control characteristic's read-back.
 uint32_t idleRemainingSeconds();
+
+// Apply an emitter-bank enable mask written to the control characteristic.
+// Implemented in main.cpp alongside applyIdleRequest(), for the same reason:
+// the FET pins and the gate state machines live there. Returns the mask
+// actually in force afterwards, which is the unchanged one if the request was
+// refused (see bank_state.h — a mask of 0 is never applied).
+uint8_t applyBankMask(uint8_t mask);
+
+// The enabled-bank mask currently in force, for the control characteristic's
+// read-back.
+uint8_t bankMask();
 
 void begin();
 bool isOtaActive();

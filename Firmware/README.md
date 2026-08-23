@@ -61,6 +61,10 @@ The previous 2-FET build split U3's gates across banks 1 and 2 (00..13 / 14..27)
 
 Driving the GPIO HIGH turns the bank's emitters on. In the default `LedMode::AUTO` the emitters are **pulsed**: all three banks are lit together only for the settle + MCP-read window of each poll (~1.75 ms at 100 kHz), then switched off until the next poll. This drops the emitter duty cycle from 100% to roughly 35% at  the default 5 ms poll interval, cutting average emitter current proportionally, with no change to detection behaviour. The IR_DEBUG console's `1` / `0` / `a` keys force steady-on, blackout and pulsed mode respectively for bench work.
 
+Each bank can also be **switched off entirely**, which is a separate control from the LED mode: HiveHub writes an enable bitmask to the control characteristic (`SET_BANKS`, protocol v5) and `include/bank_state.h` decides what is applied. One bank draws ~0.14 A at 3.3 V, two ~0.22 A, three ~0.30 A, so this is the coarsest and most effective power knob on the board — for an entrance narrower than 24 gates, or a supply that will not carry the full one.
+
+All three banks are enabled by default and after any reset; the mask is never persisted, and HiveHub re-asserts it every upload cycle. A mask of `0` is refused rather than applied. Gates on a dark bank are **skipped**, not read as "clear": an unpowered QRE1113 is a bare phototransistor under a 100 kΩ pull-up, and direct sun into the entrance can pull one low. The expander itself is still read and health-checked, so `mcps_healthy` keeps its meaning. The IR_DEBUG console's `4` / `5` / `6` keys toggle banks 1/2/3 for bench work.
+
 ### Counting
 
 Each gate is a small state machine:
@@ -180,10 +184,18 @@ Press a single key in the serial monitor:
 | `0` | Force IR LEDs OFF                                               |
 | `a` | IR LEDs AUTO (normal pulsed mode)                              |
 | `n` | Arm / clear a 60 s night-mode suspension (press again to resume) |
+| `4` | Toggle emitter bank 1 (GATE_00..07)                            |
+| `5` | Toggle emitter bank 2 (GATE_10..17)                            |
+| `6` | Toggle emitter bank 3 (GATE_20..27)                            |
 | `h` | Show the command list                                          |
 
-Each reading lists the raw MCP23017 port words plus a per-gate `BLOCK`/`clear`
-line for the inner and outer sensor. The emitters are pulsed on for every read
+The bank keys are `4`/`5`/`6` because the schematic labels those rails `/GPIO4`,
+`/GPIO5` and `/GPIO6` — misleading net names (they are physically GPIO19/20/18)
+but the ones silkscreened next to the FETs.
+
+Each reading lists the raw MCP23017 port words, the current bank mask, plus a
+per-gate `BLOCK`/`clear` line for the inner and outer sensor. A gate whose bank
+is switched off prints `<bank disabled>` rather than a beam state. The emitters are pulsed on for every read
 regardless of the LED mode, so the readout is always valid. Wave a finger or a
 bee through a gate and you should see that gate's `inner`/`outer` flip to
 `BLOCK`.
@@ -282,6 +294,13 @@ No ESP32, no MCP23017 and no bee required.
   well-formed documents full of zeros, which is indistinguishable from a spell
   of bad weather until someone reads a week of totals — so none of this is
   something a bench session would catch.
+* **`include/bank_state.h`** — the emitter-bank enable mask. Every mistake it
+  can make is silent: a bank that should be on but is off produces a
+  permanently flat third of the totals, which reads exactly like a dead FET,
+  and a bank that should be off but is on quietly costs ~80 mA on a supply
+  sized without it. The suite pins the refusal of an all-off mask, the
+  one-based bank numbering that `gates::TABLE[].led_bank` depends on, and the
+  masking of bits above the last physical bank.
 
 Everything hardware-facing stays in `src/main.cpp` and is still verified on the
 bench with the IR-sensor console above.
