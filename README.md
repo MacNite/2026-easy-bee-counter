@@ -346,7 +346,10 @@ Add solar for indefinite runtime.
 The counter is a connectable BLE peripheral. The canonical definition of the
 GATT contract lives in [`docs/ble-mode.md`](docs/ble-mode.md); this is a summary.
 
-- Advertises as `BeeCounter`; HiveHub connects by the MAC paired in its portal.
+- Advertises as `HiveTraffic-AB:12` — the product name suffixed with the last
+  two bytes of the counter's own BLE address, so several counters in range are
+  distinct rows in a scan list. HiveHub connects by the MAC paired in its
+  portal and never matches on the name.
 - One service, `8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01`, holding a READ
   measurement characteristic, a READ/WRITE control characteristic (night mode
   and emitter-bank enables) and three OTA characteristics.
