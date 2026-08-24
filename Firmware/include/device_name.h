@@ -82,7 +82,10 @@ static_assert(CAPACITY - 1 + 2 <= 31,
 // identifies the wrong device, which is worse than one that identifies no
 // device in particular.
 inline size_t build(char* out, size_t capacity, const uint8_t* addr_val) {
-    static const char HEX[] = "0123456789ABCDEF";
+    // Lower-case deliberately: this header is compiled after Arduino.h, whose
+    // Print.h defines `HEX` as 16. An all-caps name here is not a style choice
+    // but a build break — see the macro block in test/test_device_name/.
+    static const char hex_digits[] = "0123456789ABCDEF";
 
     if (out == nullptr) return 0;
 
@@ -96,11 +99,11 @@ inline size_t build(char* out, size_t capacity, const uint8_t* addr_val) {
 
     if (addr_val != nullptr) {
         out[i++] = '-';
-        out[i++] = HEX[addr_val[1] >> 4];
-        out[i++] = HEX[addr_val[1] & 0x0F];
+        out[i++] = hex_digits[addr_val[1] >> 4];
+        out[i++] = hex_digits[addr_val[1] & 0x0F];
         out[i++] = ':';
-        out[i++] = HEX[addr_val[0] >> 4];
-        out[i++] = HEX[addr_val[0] & 0x0F];
+        out[i++] = hex_digits[addr_val[0] >> 4];
+        out[i++] = hex_digits[addr_val[0] & 0x0F];
     }
 
     out[i] = '\0';

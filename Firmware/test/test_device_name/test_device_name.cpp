@@ -15,6 +15,35 @@
 // or via test/run_tests.sh, which builds every host test.
 // ============================================================================
 
+// ---------------------------------------------------------------------------
+// Arduino's macro soup, reproduced before the include on purpose.
+// ---------------------------------------------------------------------------
+// The same guard test_idle_state.cpp carries, and for the same reason: these
+// headers are built twice, here against a bare host compiler and in the
+// firmware after Arduino.h has defined a few hundred all-caps macros. The
+// second is far more hostile, and a test that only sees the first cannot catch
+// a name collision.
+//
+// This header was written with a `static const char HEX[]` lookup table and
+// met Print.h's `#define HEX 16` — the build failed with "expected
+// unqualified-id before numeric constant" after every host check had passed.
+// The number-base macros below are what bite a string-formatting header;
+// the GPIO ones are inherited from the existing guard. Deliberately NOT
+// #undef'd.
+#define DEC 10
+#define HEX 16
+#define OCT 8
+#define BIN 2
+#define DISABLED 0x00
+#define INPUT 0x01
+#define OUTPUT 0x03
+#define PULLUP 0x04
+#define PULLDOWN 0x08
+#define HIGH 0x1
+#define LOW 0x0
+#define ANALOG 0xC0
+#define OPEN_DRAIN 0x10
+
 #include "device_name.h"
 
 #include <cstdio>
