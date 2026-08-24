@@ -15,7 +15,9 @@ pio run -t upload
 
 Build HiveHub with `ENABLE_WIRELESS_BEECOUNTER=1`, then pair the counter's BLE
 MAC as a **HiveTraffic counter** in HiveHub's provisioning portal. The device
-advertises as `BeeCounter`, but HiveHub connects by the paired MAC.
+advertises as `HiveTraffic-AB:12`, where the four hex digits are the last two
+bytes of that MAC — so the scan list tells you which counter you are pairing.
+HiveHub itself connects by the paired MAC and never matches on the name.
 
 ## HiveHub GATT contract
 
@@ -76,14 +78,38 @@ The name is carried in the **scan response**, not the advertisement:
 | PDU | Contents | Bytes |
 | --- | --- | --- |
 | Advertisement | flags + the 128-bit service UUID | 21 / 31 |
-| Scan response | complete local name `BeeCounter` | 12 / 31 |
+| Scan response | complete local name `HiveTraffic-AB:12` | 19 / 31 |
 
-All three elements together are 33 bytes and do not fit one legacy 31-byte
+All three elements together are 40 bytes and do not fit one legacy 31-byte
 advertising PDU. NimBLE 2.x defaults scan response off and does not relocate an
 overflowing name on its own, so they are split explicitly in `begin()`. Keep
 them split when adding anything else to the advertisement — a counter that fails
 to advertise is invisible to the measurement read *and* to the OTA relay, which
 locates it by scan before connecting.
+
+### The name and its address suffix
+
+The advertised name is not the bare product name: it is `HiveTraffic-AB:12`,
+where the suffix is the last two bytes of the counter's own BLE address,
+rendered the way a scanner prints them. Several counters in range therefore
+appear as distinct rows, and a row is matched to a physical box by reading the
+tail of the address shown beside it — rather than by opening a detail view for
+each identical `BeeCounter` entry, which is what this replaced.
+
+NimBLE advertises with its default public address, which on the ESP32-C6 is the
+factory eFuse MAC. The suffix is therefore unique per unit, stable across
+reboots, reflashes and OTA updates, and needs nothing provisioned per device.
+The same string is written to the GAP Device Name characteristic, so a client
+that connects and reads it agrees with the scan list.
+
+Only the last two bytes are in the name, so two counters whose addresses share
+them are not told apart by it — 1 in 65536 for factory addresses, and the
+address itself still distinguishes them. If the address cannot be read at all,
+the bare `HiveTraffic` is advertised rather than nothing.
+
+None of this is on the wire contract: `fw` does not move, HiveHub connects by
+the paired MAC, and no client matches on the name. The string is built by
+`include/device_name.h` and pinned by `test/test_device_name/`.
 
 ## Counting and interval semantics
 

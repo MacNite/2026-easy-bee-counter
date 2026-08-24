@@ -7,13 +7,20 @@
 #include <stdio.h>
 
 #include "counter_protocol.h"
+#include "device_name.h"
 #include "measurement_json.h"
 #include "version.h"
 
 namespace ble {
 namespace {
 
-constexpr char BLE_DEVICE_NAME[] = "BeeCounter";
+// The advertised local name, "HiveTraffic-AB:12", built once in begin() from
+// this counter's own BLE address so several in range are distinguishable in a
+// scan list (include/device_name.h). File scope rather than a local in begin()
+// because the log line below reads it too, and because it is the one place the
+// name exists — nothing should reconstruct it.
+char deviceName[devicename::CAPACITY];
+
 constexpr char SVC_BEECOUNTER[] = "8e8b0101-7a1c-4b9e-9a2f-1d6e0b9c1a01";
 constexpr char CHR_MEASUREMENT[] = "8e8b0102-7a1c-4b9e-9a2f-1d6e0b9c1a01";
 // Night mode: HiveHub writes a suspension DURATION here, and reads back the
@@ -352,6 +359,49 @@ class ServerCallbacks : public NimBLEServerCallbacks {
     }
 };
 
+// Fill deviceName with "HiveTraffic-AB:12", the product name suffixed with the
+// last two bytes of this counter's own BLE address.
+//
+// Must run AFTER NimBLEDevice::init(): the address comes from the controller,
+// and init() is what starts it — it blocks until the host and controller have
+// synced, so the address is readable the moment it returns, but not one line
+// earlier.
+//
+// The address NimBLE reports here is the one it goes on to advertise with:
+// both read the own-address type that init() settled, which is the controller's
+// public address whenever it has one — on the ESP32-C6 the factory eFuse MAC.
+// The suffix is therefore literally the tail of the address a scanner shows
+// beside the entry, needs no provisioning, and survives reboots, reflashes and
+// OTA updates.
+//
+// If the address cannot be read, the bare product name is advertised. That is
+// a far better failure than not advertising at all: a counter HiveHub cannot
+// see is invisible to the measurement read AND to the OTA relay, and HiveHub
+// finds it by the paired MAC regardless of what the name says.
+void buildDeviceName() {
+    const NimBLEAddress address = NimBLEDevice::getAddress();
+    const bool haveAddress = !address.isNull();
+
+    if (!devicename::build(deviceName, sizeof(deviceName),
+                           haveAddress ? address.getVal() : nullptr)) {
+        // Only reachable if CAPACITY and the name it sizes ever disagree, which
+        // the header's static_assert and test/test_device_name/ both rule out.
+        // Left as a hard fallback rather than an assert: an unnamed counter
+        // still counts bees and still relays firmware.
+        deviceName[0] = '\0';
+    }
+    if (!haveAddress) {
+        Serial.println(F("[BLE] no address available; advertising unsuffixed name"));
+    }
+
+    // Keep the GAP Device Name characteristic in step with the advertised one,
+    // so a client that connects and reads it — rather than trusting the scan
+    // response — sees the same identity.
+    if (!NimBLEDevice::setDeviceName(deviceName)) {
+        Serial.println(F("[BLE] GAP device name not updated"));
+    }
+}
+
 // NimBLE stores these pointers for the lifetime of the server and never frees
 // them: NimBLECharacteristic::setCallbacks() takes no ownership at all, so the
 // old `new X(), true` form both fails to compile against NimBLE 2.5.x (the
@@ -367,7 +417,13 @@ ServerCallbacks serverCallbacks;
 }  // namespace
 
 void begin() {
-    NimBLEDevice::init(BLE_DEVICE_NAME);
+    // init() takes a name because it must set one before the GATT server
+    // exists; the address it is built from is only available once init() has
+    // synced the host and controller, so the suffixed name is applied
+    // immediately afterwards by buildDeviceName().
+    NimBLEDevice::init(devicename::BASE);
+    buildDeviceName();
+
     NimBLEServer* server = NimBLEDevice::createServer();
     // false: never delete a statically allocated callback object.
     server->setCallbacks(&serverCallbacks, false);
@@ -404,7 +460,7 @@ void begin() {
     //
     //     flags                 3   (added by NimBLE at start())
     //     128-bit service UUID  18  (2 + 16)
-    //     "BeeCounter"          12  (2 + 10)   -> 33 > 31
+    //     "HiveTraffic-AB:12"   19  (2 + 17)   -> 40 > 31
     //
     // NimBLE 2.x leaves scan response DISABLED by default and does not silently
     // relocate the name, so setting all three on the advertisement overflows and
@@ -412,10 +468,11 @@ void begin() {
     // not advertise is invisible to BOTH the measurement read and the OTA relay,
     // which locates it by a scan first (HiveHub ble_sensor.cpp::otaBegin).
     // Splitting them keeps the advertisement at 21 bytes and the scan response
-    // at 12, with room to spare on each.
+    // at 19, with room to spare on each. The name is the element that grows, so
+    // device_name.h static_asserts its own longest form against that 31.
     advertising->addServiceUUID(service->getUUID());
     NimBLEAdvertisementData scanResponse;
-    scanResponse.setName(BLE_DEVICE_NAME);
+    scanResponse.setName(deviceName);
     advertising->setScanResponseData(scanResponse);
     advertising->enableScanResponse(true);
     advertising->setMinInterval(ADV_INTERVAL_UNITS);
@@ -426,7 +483,9 @@ void begin() {
         Serial.println(F("[BLE] ERROR: advertising failed to start"));
         return;
     }
-    Serial.printf("[BLE] HiveTraffic %s advertising for HiveHub\n",
+    // The name is logged, not just the version: it is what someone comparing
+    // the serial console with a scan list on their phone needs to match up.
+    Serial.printf("[BLE] %s %s advertising for HiveHub\n", deviceName,
                   HIVETRAFFIC_FW_VERSION);
 }
 

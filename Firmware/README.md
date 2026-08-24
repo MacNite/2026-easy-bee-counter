@@ -263,9 +263,9 @@ Each MCP23017 is tracked at runtime rather than only at boot:
 
 ## Tests
 
-Two pure headers carry logic that is worth testing without hardware, so both are
-deliberately free of Arduino, I2C and NimBLE dependencies and both run on a host
-compiler:
+Several pure headers carry logic that is worth testing without hardware, so each
+is deliberately free of Arduino, I2C and NimBLE dependencies and all of them run
+on a host compiler:
 
 ```
 ./test/run_tests.sh
@@ -301,6 +301,14 @@ No ESP32, no MCP23017 and no bee required.
   sized without it. The suite pins the refusal of an all-off mask, the
   one-based bank numbering that `gates::TABLE[].led_bank` depends on, and the
   masking of bits above the last physical bank.
+* **`include/device_name.h`** — the advertised BLE name, `HiveTraffic-AB:12`.
+  The suffix is the last two bytes of the counter's own address, and every way
+  of getting it wrong produces a name that still looks like a name while
+  pointing at the wrong device: the suite pins the byte order (NimBLE stores
+  addresses little-endian, so the two bytes are `val[1]`, `val[0]`), the
+  two-digit uppercase rendering a scanner matches against, the fallback when no
+  address can be read, and the refusal to truncate into a buffer that cannot
+  hold the whole name.
 
 Everything hardware-facing stays in `src/main.cpp` and is still verified on the
 bench with the IR-sensor console above.
@@ -319,7 +327,7 @@ Easy Bee Counter 2026 — firmware booting (BLE/GATT link)
 [MCP] U2 (gates 00..07) @ 0x20: OK
 [MCP] U3 (gates 10..17) @ 0x21: OK
 [MCP] U4 (gates 20..27) @ 0x22: OK
-[BLE] HiveTraffic 0.1.0 advertising for HiveHub
+[BLE] HiveTraffic-AB:12 0.3.1 advertising for HiveHub
 [SETUP] Entering normal counting loop (pulsed IR)
 ```
 
